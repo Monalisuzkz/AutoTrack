@@ -155,7 +155,7 @@ namespace AutoTrack.Forms
                         {
                             new SqlParameter("@Name", txtName.Text.Trim()),
                             new SqlParameter("@User", txtUser.Text.Trim()),
-                            new SqlParameter("@Pass", PasswordHelper.HashPassword(txtPass.Text.Trim())),
+                            new SqlParameter("@Pass", PasswordHelper.HashPassword(txtPass.Text)),
                             new SqlParameter("@Role", cboRole.Text),
                             new SqlParameter("@Active", chkActive.Checked ? 1 : 0),
                             new SqlParameter("@ID", _id)
@@ -181,7 +181,7 @@ namespace AutoTrack.Forms
                         {
                             new SqlParameter("@Name", txtName.Text.Trim()),
                             new SqlParameter("@User", txtUser.Text.Trim()),
-                            new SqlParameter("@Pass", PasswordHelper.HashPassword(txtPass.Text.Trim())),
+                            new SqlParameter("@Pass", PasswordHelper.HashPassword(txtPass.Text)),
                             new SqlParameter("@Role", cboRole.Text),
                             new SqlParameter("@Active", chkActive.Checked ? 1 : 0)
                         });

@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Windows.Forms;
 using AutoTrack.Database;
 using AutoTrack.Helpers;
@@ -18,7 +19,7 @@ namespace AutoTrack.Forms
         private void btnLogin_Click(object sender, EventArgs e)
         {
             string username = txtUsername.Text.Trim();
-            string password = txtPassword.Text.Trim();
+            string password = txtPassword.Text;
 
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
@@ -65,6 +66,7 @@ namespace AutoTrack.Forms
                                 new SqlParameter("@Password", upgradedHash),
                                 new SqlParameter("@UserID", Convert.ToInt32(row["UserID"]))
                             });
+                        Trace.TraceInformation("Password hash upgraded for user ID " + Convert.ToInt32(row["UserID"]));
                     }
 
                     SessionManager.CurrentUser = new User

@@ -7,7 +7,7 @@ namespace AutoTrack.Helpers
     {
         private const int SaltSize = 16;
         private const int KeySize = 32;
-        private const int Iterations = 600000;
+        private const int Iterations = 310000;
         private const string CurrentAlgorithmTag = "PBKDF2-SHA256";
         private const string LegacyAlgorithmTag = "PBKDF2";
 
