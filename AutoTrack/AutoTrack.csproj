@@ -196,6 +196,7 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="Helpers\NotificationHelper.cs" />
+    <Compile Include="Helpers\PasswordHelper.cs" />
     <Compile Include="Helpers\PrintHelper.cs" />
     <Compile Include="Helpers\SessionManager.cs" />
     <Compile Include="Models\Customer.cs" />
