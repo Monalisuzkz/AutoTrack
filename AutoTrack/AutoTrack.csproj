@@ -123,9 +123,6 @@
     <Compile Include="Forms\AllForms.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Forms\AllPanels.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
     <Compile Include="Forms\ArchivedInventoryPanel.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -158,6 +155,25 @@
     <Compile Include="Forms\PaymentsPanel.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="Forms\UsersPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\TechniciansPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\ServiceRecordsPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\InventoryPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\SuppliersPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\ReportsPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\LabelExt.cs" />
     <Compile Include="Forms\RestockRequestsPanel.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -171,7 +187,11 @@
     <Compile Include="Helpers\PrintHelper.cs" />
     <Compile Include="Helpers\SessionManager.cs" />
     <Compile Include="Models\Customer.cs" />
-    <Compile Include="Models\OtherModels.cs" />
+    <Compile Include="Models\Technician.cs" />
+    <Compile Include="Models\Supplier.cs" />
+    <Compile Include="Models\InventoryItem.cs" />
+    <Compile Include="Models\Payment.cs" />
+    <Compile Include="Models\RestockRequest.cs" />
     <Compile Include="Models\ServiceRecord.cs" />
     <Compile Include="Models\User.cs" />
     <Compile Include="Models\Vehicle.cs" />
