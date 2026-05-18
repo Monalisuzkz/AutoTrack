@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -44,7 +45,10 @@ namespace AutoTrack.Forms
                 if (uid == 0) return;
                 UnreadCount = NotificationHelper.GetUnreadCount(uid);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Trace.TraceError("Failed to refresh notification count: " + ex);
+            }
         }
 
         protected override void OnPaint(PaintEventArgs e)

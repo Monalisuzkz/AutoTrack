@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Windows.Forms;
 using AutoTrack.Database;
 using AutoTrack.Helpers;
@@ -18,7 +19,7 @@ namespace AutoTrack.Forms
         private void btnLogin_Click(object sender, EventArgs e)
         {
             string username = txtUsername.Text.Trim();
-            string password = txtPassword.Text.Trim();
+            string password = txtPassword.Text;
 
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
@@ -31,15 +32,13 @@ namespace AutoTrack.Forms
             {
                 // Use a single query - don't reuse parameters
                 string query = @"
-                    SELECT UserID, FullName, Username, Role, IsActive
+                    SELECT UserID, FullName, Username, Role, IsActive, Password
                     FROM Users 
-                    WHERE Username = @Username 
-                    AND Password = @Password
+                    WHERE Username = @Username
                     AND IsActive = 1";
 
                 SqlParameter[] parameters = {
-                    new SqlParameter("@Username", username),
-                    new SqlParameter("@Password", password)
+                    new SqlParameter("@Username", username)
                 };
 
                 DataTable dt = DatabaseHelper.ExecuteQuery(query, parameters);
@@ -47,6 +46,28 @@ namespace AutoTrack.Forms
                 if (dt.Rows.Count > 0)
                 {
                     DataRow row = dt.Rows[0];
+                    string storedPassword = row["Password"]?.ToString() ?? string.Empty;
+                    if (!PasswordHelper.VerifyPassword(password, storedPassword))
+                    {
+                        MessageBox.Show("Invalid username or password. Please try again.",
+                            "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        txtPassword.Clear();
+                        txtPassword.Focus();
+                        return;
+                    }
+
+                    if (PasswordHelper.NeedsRehash(storedPassword))
+                    {
+                        string upgradedHash = PasswordHelper.HashPassword(password);
+                        DatabaseHelper.ExecuteNonQuery(
+                            "UPDATE Users SET Password=@Password, UpdatedAt=GETDATE() WHERE UserID=@UserID",
+                            new[]
+                            {
+                                new SqlParameter("@Password", upgradedHash),
+                                new SqlParameter("@UserID", Convert.ToInt32(row["UserID"]))
+                            });
+                        Trace.TraceInformation("Password hash upgraded for user ID " + Convert.ToInt32(row["UserID"]));
+                    }
 
                     SessionManager.CurrentUser = new User
                     {

@@ -65,7 +65,7 @@ namespace AutoTrack.Forms
                 SqlParameter[] p = null;
                 if (!string.IsNullOrEmpty(search) && search != txtSearch.Tag?.ToString())
                 {
-                    query += @" WHERE FirstName+' '+LastName LIKE @S OR Phone LIKE @S OR Email LIKE @S";
+                    query += @" WHERE (FirstName+' '+LastName LIKE @S OR Phone LIKE @S OR Email LIKE @S)";
                     p = new[] { new SqlParameter("@S", "%" + search + "%") };
                 }
                 query += " ORDER BY CreatedAt DESC";
