@@ -55,7 +55,7 @@ namespace AutoTrack.Forms
                         return;
                     }
 
-                    if (!PasswordHelper.IsPasswordHashed(storedPassword))
+                    if (PasswordHelper.NeedsRehash(storedPassword))
                     {
                         string upgradedHash = PasswordHelper.HashPassword(password);
                         DatabaseHelper.ExecuteNonQuery(

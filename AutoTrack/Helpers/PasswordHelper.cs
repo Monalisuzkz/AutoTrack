@@ -7,8 +7,9 @@ namespace AutoTrack.Helpers
     {
         private const int SaltSize = 16;
         private const int KeySize = 32;
-        private const int Iterations = 100000;
-        private const string AlgorithmTag = "PBKDF2";
+        private const int Iterations = 600000;
+        private const string CurrentAlgorithmTag = "PBKDF2-SHA256";
+        private const string LegacyAlgorithmTag = "PBKDF2";
 
         public static string HashPassword(string password)
         {
@@ -20,10 +21,10 @@ namespace AutoTrack.Helpers
                 var salt = new byte[SaltSize];
                 rng.GetBytes(salt);
 
-                using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, Iterations))
+                using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, Iterations, HashAlgorithmName.SHA256))
                 {
                     byte[] key = pbkdf2.GetBytes(KeySize);
-                    return $"{AlgorithmTag}${Iterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(key)}";
+                    return $"{CurrentAlgorithmTag}${Iterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(key)}";
                 }
             }
         }
@@ -52,16 +53,37 @@ namespace AutoTrack.Helpers
                 return false;
             }
 
-            using (var pbkdf2 = new Rfc2898DeriveBytes(enteredPassword, salt, iterations))
-            {
-                byte[] actualKey = pbkdf2.GetBytes(expectedKey.Length);
-                return SlowEquals(actualKey, expectedKey);
-            }
+            if (string.Equals(parts[0], CurrentAlgorithmTag, StringComparison.Ordinal))
+                return VerifyDerivedKey(enteredPassword, salt, iterations, expectedKey, HashAlgorithmName.SHA256);
+
+            if (string.Equals(parts[0], LegacyAlgorithmTag, StringComparison.Ordinal))
+                return VerifyDerivedKey(enteredPassword, salt, iterations, expectedKey, HashAlgorithmName.SHA1);
+
+            return false;
         }
 
         public static bool IsPasswordHashed(string storedPassword)
         {
-            return !string.IsNullOrEmpty(storedPassword) && storedPassword.StartsWith(AlgorithmTag + "$", StringComparison.Ordinal);
+            return !string.IsNullOrEmpty(storedPassword) &&
+                   (storedPassword.StartsWith(CurrentAlgorithmTag + "$", StringComparison.Ordinal) ||
+                    storedPassword.StartsWith(LegacyAlgorithmTag + "$", StringComparison.Ordinal));
+        }
+
+        public static bool NeedsRehash(string storedPassword)
+        {
+            if (string.IsNullOrEmpty(storedPassword))
+                return false;
+
+            return !storedPassword.StartsWith(CurrentAlgorithmTag + "$", StringComparison.Ordinal);
+        }
+
+        private static bool VerifyDerivedKey(string enteredPassword, byte[] salt, int iterations, byte[] expectedKey, HashAlgorithmName algorithm)
+        {
+            using (var pbkdf2 = new Rfc2898DeriveBytes(enteredPassword, salt, iterations, algorithm))
+            {
+                byte[] actualKey = pbkdf2.GetBytes(expectedKey.Length);
+                return SlowEquals(actualKey, expectedKey);
+            }
         }
 
         private static bool SlowEquals(byte[] a, byte[] b)
