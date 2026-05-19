@@ -85,8 +85,93 @@ namespace AutoTrack.Forms
             dgv = CreateGrid();
             dgv.DoubleClick += EditClick;
 
+            // Add CellFormatting event for highlighting
+            dgv.CellFormatting += Dgv_CellFormatting;
+            dgv.RowPrePaint += Dgv_RowPrePaint;
+
             Controls.Add(dgv);
             Controls.Add(BuildToolbar("Inventory", txtSearch, btnSearch, btnAdd, btnEdit, btnArchive, btnRefresh, lblCount));
+        }
+
+        private void Dgv_RowPrePaint(object sender, DataGridViewRowPrePaintEventArgs e)
+        {
+            // Alternative method to highlight entire row based on status
+            if (e.RowIndex >= 0 && dgv.Rows[e.RowIndex].Cells["Status"].Value != null)
+            {
+                string status = dgv.Rows[e.RowIndex].Cells["Status"].Value.ToString();
+
+                if (status == "Low Stock")
+                {
+                    dgv.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.FromArgb(255, 200, 200); // Light Red
+                    dgv.Rows[e.RowIndex].DefaultCellStyle.ForeColor = Color.DarkRed;
+                    dgv.Rows[e.RowIndex].DefaultCellStyle.Font = new Font(dgv.Font, FontStyle.Bold);
+                }
+                else if (status == "Out of Stock")
+                {
+                    dgv.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.FromArgb(255, 150, 150); // Darker Red
+                    dgv.Rows[e.RowIndex].DefaultCellStyle.ForeColor = Color.DarkRed;
+                    dgv.Rows[e.RowIndex].DefaultCellStyle.Font = new Font(dgv.Font, FontStyle.Bold);
+                }
+                else
+                {
+                    // Reset to default for normal rows
+                    dgv.Rows[e.RowIndex].DefaultCellStyle.BackColor = dgv.DefaultCellStyle.BackColor;
+                    dgv.Rows[e.RowIndex].DefaultCellStyle.ForeColor = dgv.DefaultCellStyle.ForeColor;
+                    dgv.Rows[e.RowIndex].DefaultCellStyle.Font = dgv.DefaultCellStyle.Font;
+                }
+            }
+        }
+
+        private void Dgv_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            // Highlight specific cells (Qty and Status columns) based on stock level
+            if (e.RowIndex >= 0 && dgv.Columns[e.ColumnIndex].Name == "Qty" && e.Value != null)
+            {
+                int qty = Convert.ToInt32(e.Value);
+                int reorderLevel = 0;
+
+                // Get reorder level from the same row
+                if (dgv.Rows[e.RowIndex].Cells["Reorder At"].Value != null)
+                {
+                    reorderLevel = Convert.ToInt32(dgv.Rows[e.RowIndex].Cells["Reorder At"].Value);
+                }
+
+                if (qty <= 0)
+                {
+                    e.CellStyle.BackColor = Color.FromArgb(255, 100, 100); // Bright Red
+                    e.CellStyle.ForeColor = Color.White;
+                    e.CellStyle.Font = new Font(dgv.Font, FontStyle.Bold);
+                }
+                else if (qty <= reorderLevel)
+                {
+                    e.CellStyle.BackColor = Color.FromArgb(255, 200, 200); // Light Red
+                    e.CellStyle.ForeColor = Color.DarkRed;
+                    e.CellStyle.Font = new Font(dgv.Font, FontStyle.Bold);
+                }
+            }
+
+            if (e.RowIndex >= 0 && dgv.Columns[e.ColumnIndex].Name == "Status" && e.Value != null)
+            {
+                string status = e.Value.ToString();
+
+                if (status == "Low Stock")
+                {
+                    e.CellStyle.BackColor = Color.FromArgb(255, 200, 200);
+                    e.CellStyle.ForeColor = Color.DarkRed;
+                    e.CellStyle.Font = new Font(dgv.Font, FontStyle.Bold);
+                }
+                else if (status == "Out of Stock")
+                {
+                    e.CellStyle.BackColor = Color.FromArgb(255, 100, 100);
+                    e.CellStyle.ForeColor = Color.White;
+                    e.CellStyle.Font = new Font(dgv.Font, FontStyle.Bold);
+                }
+                else if (status == "In Stock")
+                {
+                    e.CellStyle.BackColor = Color.FromArgb(200, 255, 200);
+                    e.CellStyle.ForeColor = Color.DarkGreen;
+                }
+            }
         }
 
         private void LoadData(string search = "")
@@ -94,15 +179,17 @@ namespace AutoTrack.Forms
             try
             {
                 string q = @"SELECT p.PartID, p.PartName AS [Part Name], p.Category, p.Unit,
-                    p.Quantity AS [Qty], p.ReorderLevel AS [Reorder At],
-                    p.UnitPrice AS [Unit Price (₱)], s.CompanyName AS [Supplier],
-                    p.SupplierID,
-                    CASE WHEN p.Quantity<=0 THEN 'Out of Stock'
-                         WHEN p.Quantity<=p.ReorderLevel THEN 'Low Stock'
-                         ELSE 'In Stock' END AS [Status]
-                    FROM Inventory p 
-                    LEFT JOIN Suppliers s ON p.SupplierID = s.SupplierID
-                    WHERE p.IsArchived = 0";
+            p.Quantity AS [Qty], p.ReorderLevel AS [Reorder At],
+            p.UnitPrice AS [Unit Price (₱)], s.CompanyName AS [Supplier],
+            p.SupplierID,
+            CASE 
+                WHEN p.Quantity <= 0 THEN 'Out of Stock'
+                WHEN p.Quantity <= p.ReorderLevel THEN 'Low Stock'
+                ELSE 'In Stock' 
+            END AS [Status]
+            FROM Inventory p 
+            LEFT JOIN Suppliers s ON p.SupplierID = s.SupplierID
+            WHERE p.IsArchived = 0";
 
                 var paramList = new System.Collections.Generic.List<SqlParameter>();
 
@@ -118,7 +205,9 @@ namespace AutoTrack.Forms
                     q += " AND (p.PartName LIKE @S OR p.Category LIKE @S OR s.CompanyName LIKE @S)";
                     paramList.Add(new SqlParameter("@S", "%" + search + "%"));
                 }
-                q += " ORDER BY p.PartName";
+
+                // Fixed ORDER BY clause - no line breaks in the middle
+                q += " ORDER BY CASE WHEN p.Quantity <= 0 THEN 1 WHEN p.Quantity <= p.ReorderLevel THEN 2 ELSE 3 END, p.PartName";
 
                 DataTable dt = DatabaseHelper.ExecuteQuery(q, paramList.ToArray());
 
@@ -127,6 +216,16 @@ namespace AutoTrack.Forms
                     dgv.DataSource = null;
                     dgv.DataSource = dt;
                     HideColumns();
+
+                    // Set column colors
+                    if (dgv.Columns["Status"] != null)
+                    {
+                        dgv.Columns["Status"].DefaultCellStyle.Font = new Font(dgv.Font, FontStyle.Bold);
+                    }
+                    if (dgv.Columns["Qty"] != null)
+                    {
+                        dgv.Columns["Qty"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                    }
                 }
 
                 lblCount.Text = $"{dt.Rows.Count} item(s) found";
