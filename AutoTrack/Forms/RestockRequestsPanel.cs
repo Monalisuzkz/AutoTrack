@@ -229,7 +229,7 @@ namespace AutoTrack.Forms
 
                 if (role == "Supplier")
                 {
-                    query += " AND rr.RequestedBy = @UserID";
+                    query += " AND p.SupplierID = (SELECT SupplierID FROM Suppliers WHERE ContactPerson = (SELECT FullName FROM Users WHERE UserID = @UserID))";
                     paramList.Add(new SqlParameter("@UserID", userId));
                 }
 

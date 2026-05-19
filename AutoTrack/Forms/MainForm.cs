@@ -236,6 +236,7 @@ namespace AutoTrack.Forms
             btnRestockRequests.Visible = true;
             btnSubscriptions.Visible = true;
             btnReports.Visible = true;
+            btnArchivedItems.Visible = true;
         }
 
         private void ShowStaffMenu()
@@ -1069,9 +1070,9 @@ namespace AutoTrack.Forms
         private void btnArchivedItems_Click(object sender, EventArgs e)
         {
             string role = SessionManager.CurrentUser?.Role ?? "";
-            if (role == "Staff" || role == "Technician")
+            if (role != "SuperAdmin" && role != "Admin")
             {
-                MessageBox.Show($"Access Denied!\n\nYour role '{role}' does not have permission to access Archived Items.\n\nOnly SuperAdmin, Admin, and Suppliers can access archived items.",
+                MessageBox.Show($"Access Denied!\n\nYour role '{role}' does not have permission to access Archived Items.\n\nOnly SuperAdmin and Admin can access archived items.",
                     "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
