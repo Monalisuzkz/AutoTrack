@@ -232,8 +232,17 @@ namespace AutoTrack.Forms
                 // If Supplier role, only show requests for THEIR supplier
                 if (role == "Supplier")
                 {
-                    query += " AND rr.SupplierID = (SELECT SupplierID FROM Users WHERE UserID = @UserID)";
-                    paramList.Add(new SqlParameter("@UserID", userId));
+                    object supplierIdObj = DatabaseHelper.ExecuteScalar(@"
+                        SELECT s.SupplierID
+                        FROM Suppliers s
+                        INNER JOIN Users u ON s.ContactPerson = u.FullName
+                        WHERE u.UserID = @UserID",
+                        new[] { new SqlParameter("@UserID", userId) });
+
+                    int supplierId;
+                    bool hasSupplierId = int.TryParse(supplierIdObj?.ToString(), out supplierId) && supplierId > 0;
+                    query += " AND p.SupplierID = @SupplierID";
+                    paramList.Add(new SqlParameter("@SupplierID", hasSupplierId ? supplierId : -1));
                 }
 
                 if (!string.IsNullOrEmpty(statusFilter))
@@ -778,4 +787,5 @@ namespace AutoTrack.Forms
             }
         }
     }
+
 }
