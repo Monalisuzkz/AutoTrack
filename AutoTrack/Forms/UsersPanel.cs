@@ -49,7 +49,7 @@ namespace AutoTrack.Forms
                     CASE WHEN IsActive=1 THEN 'Active' ELSE 'Inactive' END AS [Status],
                     CONVERT(VARCHAR,CreatedAt,107) AS [Created] 
                     FROM Users 
-                    WHERE Role IN ('SuperAdmin', 'Admin', 'Staff', 'Technician', 'Supplier')";  // ← Add this filter
+                    WHERE Role IN ('SuperAdmin', 'Admin', 'Staff', 'Technician', 'Supplier')"; 
 
                 SqlParameter[] p = null;
                 if (!string.IsNullOrEmpty(search) && !search.StartsWith("Search"))

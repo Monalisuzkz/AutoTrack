@@ -38,7 +38,7 @@ namespace AutoTrack.Forms
         private void Init()
         {
             Text = _edit ? "Edit Service Record" : "New Service Record";
-            Size = new Size(760, 680);
+            Size = new Size(760, 625);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -78,7 +78,10 @@ namespace AutoTrack.Forms
                 Size = new Size(480, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 200,   
+                MaxDropDownItems = 10, 
+                IntegralHeight = true
             };
             Controls.Add(lblVehicle);
             Controls.Add(cboVehicle);
@@ -106,7 +109,10 @@ namespace AutoTrack.Forms
                 Size = new Size(300, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 200,
+                MaxDropDownItems = 12,
+                IntegralHeight = true
             };
             Controls.Add(lblType);
             Controls.Add(cboServiceType);
@@ -120,7 +126,10 @@ namespace AutoTrack.Forms
                 Size = new Size(220, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 150,
+                MaxDropDownItems = 8,
+                IntegralHeight = true
             };
 
             var lblAssigned = Lbl("Assigned By:", fieldX + 240, currentY);
@@ -130,7 +139,10 @@ namespace AutoTrack.Forms
                 Size = new Size(200, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 150,
+                MaxDropDownItems = 8,
+                IntegralHeight = true
             };
             Controls.Add(lblTech);
             Controls.Add(cboTech);
@@ -146,7 +158,10 @@ namespace AutoTrack.Forms
                 Size = new Size(180, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 120,
+                MaxDropDownItems = 4,
+                IntegralHeight = true
             };
             cboStatus.Items.AddRange(new object[] { "Pending", "InProgress", "Completed", "Cancelled" });
             Controls.Add(lblStatus);

@@ -447,7 +447,7 @@ namespace AutoTrack.Forms
         private void Init()
         {
             Text = "Request Restock";
-            Size = new Size(500, 520);
+            Size = new Size(500, 480);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -471,7 +471,9 @@ namespace AutoTrack.Forms
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10f),
                 BackColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                FlatStyle = FlatStyle.Flat,
+                DropDownHeight = 200,  
+                MaxDropDownItems = 10  
             };
 
             var lblSupplier = new Label { Text = "Select Supplier:", Location = new Point(20, 124), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
@@ -482,7 +484,9 @@ namespace AutoTrack.Forms
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10f),
                 BackColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                FlatStyle = FlatStyle.Flat,
+                DropDownHeight = 150,
+                MaxDropDownItems = 5
             };
 
             var lblQuantity = new Label { Text = "Quantity:", Location = new Point(20, 188), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
