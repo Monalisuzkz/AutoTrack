@@ -51,7 +51,22 @@ namespace AutoTrack.Forms
             cboFilter.SelectedIndexChanged += (s, e) => LoadData();
 
             btnSearch.Click += (s, e) => LoadData(txtSearch.Text);
-            btnAdd.Click += (s, e) => { var f = new ServiceForm(); if (f.ShowDialog() == DialogResult.OK) LoadData(); };
+            btnAdd.Click += (s, e) =>
+            {
+                // Check role BEFORE creating the form
+                string currentRole = SessionManager.CurrentUser?.Role ?? "";
+
+                if (currentRole == "Technician")
+                {
+                    MessageBox.Show("Technicians cannot create new service records.\nPlease contact an administrator.",
+                        "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var f = new ServiceForm();
+                if (f.ShowDialog() == DialogResult.OK)
+                    LoadData();
+            };
             btnEdit.Click += EditClick;
             btnDelete.Click += DeleteClick;
             btnRefresh.Click += (s, e) => LoadData();
@@ -200,22 +215,26 @@ namespace AutoTrack.Forms
             {
                 string filter = cboFilter?.SelectedItem?.ToString() ?? "All";
                 string q = @"SELECT sr.ServiceID, sr.JobOrderNo AS [Job #],
-                    v.PlateNumber AS [Plate], v.Make+' '+v.Model AS [Vehicle],
-                    sr.ServiceType AS [Service Type], ISNULL(u.FullName, 'Unassigned') AS [Technician],
-                    sr.Status, CONVERT(VARCHAR,sr.DateIn,107) AS [Date In],
-                    CONVERT(VARCHAR,sr.EstimatedDate,107) AS [Est. Done],
-                    sr.LaborCost AS [Labor Cost],
-                    sr.PartsCost AS [Parts Cost],
-                    sr.Discount,
-                    sr.TotalCost AS [Total Cost],
-                    sr.FinalAmount AS [Amount]
-                    FROM ServiceRecords sr
-                    LEFT JOIN Vehicles v ON sr.VehicleID=v.VehicleID
-                    LEFT JOIN Technicians t ON sr.TechnicianID=t.TechnicianID
-                    LEFT JOIN Users u ON t.UserID=u.UserID
-                    WHERE 1=1";
+            v.PlateNumber AS [Plate], v.Make+' '+v.Model AS [Vehicle],
+            sr.ServiceType AS [Service Type], ISNULL(u.FullName, 'Unassigned') AS [Technician],
+            sr.Status, CONVERT(VARCHAR,sr.DateIn,107) AS [Date In],
+            CONVERT(VARCHAR,sr.EstimatedDate,107) AS [Est. Done],
+            sr.LaborCost AS [Labor Cost],
+            sr.PartsCost AS [Parts Cost],
+            sr.Discount,
+            sr.TotalCost AS [Total Cost],
+            sr.FinalAmount AS [Amount]
+            FROM ServiceRecords sr
+            LEFT JOIN Vehicles v ON sr.VehicleID=v.VehicleID
+            LEFT JOIN Technicians t ON sr.TechnicianID=t.TechnicianID
+            LEFT JOIN Users u ON t.UserID=u.UserID
+            WHERE 1=1";
 
-                if (_userRole == "Technician")
+                // Get current user role from SessionManager
+                string currentRole = SessionManager.CurrentUser?.Role ?? "";
+                int currentUserId = SessionManager.CurrentUser?.UserID ?? 0;
+
+                if (currentRole == "Technician")
                 {
                     q += " AND t.UserID = @UserID";
                 }
@@ -224,9 +243,9 @@ namespace AutoTrack.Forms
 
                 var paramList = new System.Collections.Generic.List<SqlParameter>();
 
-                if (_userRole == "Technician" && _userId > 0)
+                if (currentRole == "Technician" && currentUserId > 0)
                 {
-                    paramList.Add(new SqlParameter("@UserID", _userId));
+                    paramList.Add(new SqlParameter("@UserID", currentUserId));
                 }
 
                 if (!string.IsNullOrEmpty(search))
@@ -241,14 +260,34 @@ namespace AutoTrack.Forms
                 BindGrid(dt);
                 lblCount.Text = $"{dgv.RowCount} record(s) found";
 
-                if (_userRole == "Technician")
+                // ===== ROLE-BASED BUTTON VISIBILITY =====
+                if (currentRole == "Technician")
                 {
+                    // Technicians can only edit (view and update status)
                     btnAdd.Visible = false;
                     btnDelete.Visible = false;
+                    btnEdit.Visible = true;
+                    btnEdit.Text = "View/Update";
+                    btnEdit.Width = 100;
+                }
+                else if (currentRole == "Staff")
+                {
+                    // Staff can add and edit, but not delete
+                    btnAdd.Visible = true;
+                    btnEdit.Visible = true;
+                    btnDelete.Visible = false;
+                }
+                else // Admin or SuperAdmin
+                {
+                    // Full access
+                    btnAdd.Visible = true;
+                    btnEdit.Visible = true;
+                    btnDelete.Visible = true;
                 }
             }
             catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
+
 
         private void EditClick(object sender, EventArgs e)
         {
@@ -259,10 +298,11 @@ namespace AutoTrack.Forms
                 return;
             }
             int id = Convert.ToInt32(dgv.SelectedRows[0].Cells["ServiceID"].Value);
+
+            // ServiceForm will handle role-based restrictions internally
             var f = new ServiceForm(id);
             if (f.ShowDialog() == DialogResult.OK) LoadData();
         }
-
         private void DeleteClick(object sender, EventArgs e)
         {
             if (dgv.SelectedRows.Count == 0)

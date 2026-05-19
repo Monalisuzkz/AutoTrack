@@ -24,7 +24,7 @@ namespace AutoTrack.Forms
             this.Dock = DockStyle.Fill;
             this.BackColor = Color.FromArgb(245, 245, 245);
             this.AutoScroll = false;
-            this.Padding = new Padding(20);
+            this.Padding = new Padding(0);
 
             lblWelcome = new Label
             {
@@ -65,6 +65,8 @@ namespace AutoTrack.Forms
 
         public StaffDashboard()
         {
+            this.MinimumSize = new Size(1020, 1400);  // Increased from 1000 to 1400
+            this.Height = 1500;                       // Increased from 1200 to 1500
             InitializeStaffControls();
             this.Resize += StaffDashboard_Resize;
         }
@@ -155,6 +157,10 @@ namespace AutoTrack.Forms
             dgvLowStockItems.Height = 200;
             dgvLowStockItems.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             this.Controls.Add(dgvLowStockItems);
+
+            int totalHeight = lowStockY + 30 + dgvLowStockItems.Height + 40;
+            this.AutoScrollMinSize = new Size(0, totalHeight);
+            this.AutoScroll = true;
         }
 
         private Panel CreateStatCard(string title, Color accent, int x, int y, int width, int height)
@@ -310,9 +316,12 @@ namespace AutoTrack.Forms
 
         public TechnicianDashboard()
         {
+            this.MinimumSize = new Size(1095, 1400);  
+            this.Height = 1500;
             InitializeTechnicianControls();
             this.Resize += TechnicianDashboard_Resize;
         }
+
 
         private void TechnicianDashboard_Resize(object sender, EventArgs e)
         {
@@ -536,6 +545,8 @@ namespace AutoTrack.Forms
 
         public SupplierDashboard()
         {
+            this.MinimumSize = new Size(1095, 1500);
+            this.Height = 1700;
             InitializeSupplierControls();
             this.Resize += SupplierDashboard_Resize;
         }
@@ -552,20 +563,20 @@ namespace AutoTrack.Forms
 
         private void InitializeSupplierControls()
         {
+            int sideMargin = 0; // Consistent with Staff/Technician
+
             // ========== STAT CARDS ==========
             int statY = 70;
-            int cardW = 200;
-            int cardH = 80;
-            int gap = 20;
-            int margin = 20;
+            int cardW = 230;
+            int cardH = 105;
+            int gap = 18;
+            int margin = 0;  // Start from left edge
 
-            // Pending Requests Card
-            var pnlPending = CreateStatCard("Pending Requests", Color.FromArgb(241, 196, 15), margin, statY, cardW, cardH);
+            var pnlPending = CreateStatCard("Pending Requests", Color.FromArgb(241, 196, 15), sideMargin, statY, cardW, cardH);
             lblPendingCount = (Label)pnlPending.Controls["lblValue"];
             this.Controls.Add(pnlPending);
 
-            // Completed Requests Card
-            var pnlCompleted = CreateStatCard("Completed Requests", Color.FromArgb(46, 204, 113), margin + cardW + gap, statY, cardW, cardH);
+            var pnlCompleted = CreateStatCard("Completed Requests", Color.FromArgb(46, 204, 113), sideMargin + cardW + gap, statY, cardW, cardH);
             lblCompletedCount = (Label)pnlCompleted.Controls["lblValue"];
             this.Controls.Add(pnlCompleted);
 
@@ -577,14 +588,14 @@ namespace AutoTrack.Forms
                 Text = "📋 Pending Restock Requests",
                 Font = new Font("Segoe UI", 12f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 30, 30),
-                Location = new Point(margin, tableY),
+                Location = new Point(sideMargin, tableY),
                 AutoSize = true
             };
             this.Controls.Add(lblPendingTitle);
 
             dgvPendingRequests = CreateDataGridView();
-            dgvPendingRequests.Location = new Point(margin, tableY + 30);
-            dgvPendingRequests.Width = this.Width - (margin * 2);
+            dgvPendingRequests.Location = new Point(sideMargin, tableY + 30);
+            dgvPendingRequests.Width = this.Width - sideMargin * 2;
             dgvPendingRequests.Height = 220;
             dgvPendingRequests.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             this.Controls.Add(dgvPendingRequests);
@@ -597,20 +608,20 @@ namespace AutoTrack.Forms
                 Text = "✅ Completed & Delivered Requests",
                 Font = new Font("Segoe UI", 12f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 30, 30),
-                Location = new Point(margin, completedY),
+                Location = new Point(sideMargin, completedY),
                 AutoSize = true
             };
             this.Controls.Add(lblCompletedTitle);
 
             dgvCompletedRequests = CreateDataGridView();
-            dgvCompletedRequests.Location = new Point(margin, completedY + 30);
-            dgvCompletedRequests.Width = this.Width - (margin * 2);
+            dgvCompletedRequests.Location = new Point(sideMargin, completedY + 30);
+            dgvCompletedRequests.Width = this.Width - sideMargin * 2;
             dgvCompletedRequests.Height = 220;
             dgvCompletedRequests.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             this.Controls.Add(dgvCompletedRequests);
 
-            // Calculate total height
-            int totalHeight = completedY + 280;
+            // Calculate total height for scrolling
+            int totalHeight = completedY + 300 + 350;
             this.AutoScrollMinSize = new Size(0, totalHeight);
         }
 
