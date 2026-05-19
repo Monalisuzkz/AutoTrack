@@ -17,7 +17,7 @@ namespace AutoTrack.Forms
         private Label lblTitle;
         private ComboBox cboVehicle, cboTech, cboStatus, cboAssignedBy;
         private ComboBox cboServiceType;
-        private TextBox txtNotes, txtDescription, txtJobOrderNo;
+        private TextBox txtNotes, txtDescription;
         private TextBox txtLaborCost, txtPartsCost, txtDiscount;
         private Label lblTotalAmount;
         private DateTimePicker dtpDateIn, dtpEstDate, dtpDateCompleted;
@@ -38,7 +38,7 @@ namespace AutoTrack.Forms
         private void Init()
         {
             Text = _edit ? "Edit Service Record" : "New Service Record";
-            Size = new Size(760, 620);
+            Size = new Size(760, 680);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -47,7 +47,6 @@ namespace AutoTrack.Forms
 
             int labelX = 20;
             int fieldX = 130;
-            int fieldWidth = 250;
             int rowHeight = 35;
             int currentY = 60;
 
@@ -113,7 +112,7 @@ namespace AutoTrack.Forms
             Controls.Add(cboServiceType);
             currentY += rowHeight;
 
-            // Row 4: Technician and Assigned By (side by side)
+            // Row 4: Technician and Assigned By
             var lblTech = Lbl("Technician:", labelX, currentY);
             cboTech = new ComboBox
             {
@@ -144,7 +143,7 @@ namespace AutoTrack.Forms
             cboStatus = new ComboBox
             {
                 Location = new Point(fieldX, currentY - 3),
-                Size = new Size(150, 28),
+                Size = new Size(180, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(245, 245, 245)
@@ -154,7 +153,7 @@ namespace AutoTrack.Forms
             Controls.Add(cboStatus);
             currentY += rowHeight;
 
-            // Row 6: Dates (Date In and Est Date side by side)
+            // Row 6: Dates
             var lblDateIn = Lbl("Date In:", labelX, currentY);
             dtpDateIn = new DateTimePicker
             {
@@ -178,7 +177,7 @@ namespace AutoTrack.Forms
             Controls.Add(dtpEstDate);
             currentY += rowHeight;
 
-            // Row 7: Date Completed (alone)
+            // Row 7: Date Completed
             var lblDateComp = Lbl("Date Completed:", labelX, currentY);
             dtpDateCompleted = new DateTimePicker
             {
@@ -234,7 +233,7 @@ namespace AutoTrack.Forms
             Controls.Add(txtDiscount);
             currentY += rowHeight;
 
-            // Row 9: Total Amount (centered)
+            // Row 9: Total Amount
             var lblTotal = Lbl("Total Amount:", labelX, currentY);
             lblTotalAmount = new Label
             {
@@ -263,10 +262,12 @@ namespace AutoTrack.Forms
             currentY += 90;
 
             // Buttons
+            int buttonY = currentY;
+
             btnSave = new Button
             {
                 Text = _edit ? "Save Changes" : "Create Record",
-                Location = new Point(labelX, currentY),
+                Location = new Point(labelX, buttonY),
                 Size = new Size(140, 40),
                 Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                 BackColor = Color.FromArgb(224, 123, 36),
@@ -280,7 +281,7 @@ namespace AutoTrack.Forms
             btnPrint = new Button
             {
                 Text = "🖨️ Print Invoice",
-                Location = new Point(labelX + 155, currentY),
+                Location = new Point(labelX + 155, buttonY),
                 Size = new Size(130, 40),
                 Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                 BackColor = Color.FromArgb(52, 152, 219),
@@ -295,7 +296,7 @@ namespace AutoTrack.Forms
             btnCancel = new Button
             {
                 Text = "Cancel",
-                Location = new Point(labelX + 300, currentY),
+                Location = new Point(labelX + 300, buttonY),
                 Size = new Size(100, 40),
                 Font = new Font("Segoe UI", 10f),
                 BackColor = Color.FromArgb(220, 220, 220),
@@ -310,12 +311,14 @@ namespace AutoTrack.Forms
             Controls.Add(btnPrint);
             Controls.Add(btnCancel);
 
-            // Calculation events
+            // Events
             txtLaborCost.TextChanged += CalculateTotal;
             txtPartsCost.TextChanged += CalculateTotal;
             txtDiscount.TextChanged += CalculateTotal;
-        }
 
+            SetupNumericValidation();
+            ApplyRoleRestrictions();
+        }
 
         private void LoadServiceTypes()
         {
@@ -328,10 +331,7 @@ namespace AutoTrack.Forms
                 cboServiceType.DisplayMember = "TypeName";
                 cboServiceType.ValueMember = "ServiceTypeID";
                 cboServiceType.DropDownStyle = ComboBoxStyle.DropDownList;
-
                 cboServiceType.SelectedIndex = -1;
-
-                // Add event to update costs when service type changes
                 cboServiceType.SelectedIndexChanged += ServiceTypeChanged;
             }
             catch (Exception ex)
@@ -350,7 +350,7 @@ namespace AutoTrack.Forms
                         "SELECT DefaultLaborCost, DefaultPartsCost FROM ServiceTypes WHERE ServiceTypeID = @TypeID",
                         new[] { new SqlParameter("@TypeID", cboServiceType.SelectedValue) });
 
-                    if (dt.Rows.Count > 0 && !_edit) // Only auto-fill for new records
+                    if (dt.Rows.Count > 0 && !_edit)
                     {
                         decimal laborCost = Convert.ToDecimal(dt.Rows[0]["DefaultLaborCost"]);
                         decimal partsCost = Convert.ToDecimal(dt.Rows[0]["DefaultPartsCost"]);
@@ -363,7 +363,6 @@ namespace AutoTrack.Forms
                 }
                 catch (Exception ex)
                 {
-                    // Silent fail - user can still enter manually
                     System.Diagnostics.Debug.WriteLine($"Error loading default costs: {ex.Message}");
                 }
             }
@@ -403,7 +402,6 @@ namespace AutoTrack.Forms
                 cboVehicle.ValueMember = "VehicleID";
                 cboVehicle.DropDownStyle = ComboBoxStyle.DropDownList;
 
-                // Clear any existing selection
                 if (cboVehicle.Items.Count > 0)
                 {
                     cboVehicle.SelectedIndex = -1;
@@ -417,7 +415,6 @@ namespace AutoTrack.Forms
         {
             try
             {
-                // Get only technicians (users with role 'Technician' who are in Technicians table)
                 DataTable dt = DatabaseHelper.ExecuteQuery(@"
             SELECT 
                 t.TechnicianID, 
@@ -430,12 +427,10 @@ namespace AutoTrack.Forms
             AND u.Role = 'Technician'
             ORDER BY t.IsAvailable DESC, u.FullName");
 
-                // Create a new DataTable WITHOUT Unassigned option
                 DataTable result = new DataTable();
                 result.Columns.Add("TechnicianID", typeof(object));
                 result.Columns.Add("DisplayName", typeof(string));
 
-                // Add all technicians (NO Unassigned option)
                 foreach (DataRow row in dt.Rows)
                 {
                     DataRow newRow = result.NewRow();
@@ -449,7 +444,6 @@ namespace AutoTrack.Forms
                 cboTech.DisplayMember = "DisplayName";
                 cboTech.ValueMember = "TechnicianID";
                 cboTech.DropDownStyle = ComboBoxStyle.DropDownList;
-
                 cboTech.SelectedIndex = -1;
             }
             catch (Exception ex)
@@ -468,7 +462,6 @@ namespace AutoTrack.Forms
                 cboAssignedBy.DisplayMember = "FullName";
                 cboAssignedBy.ValueMember = "UserID";
 
-                // Set default selection if available
                 if (dt.Rows.Count > 0)
                 {
                     cboAssignedBy.SelectedIndex = -1;
@@ -487,7 +480,6 @@ namespace AutoTrack.Forms
                 {
                     DataRow r = dt.Rows[0];
 
-                    txtJobOrderNo.Text = r["JobOrderNo"].ToString();
                     cboVehicle.SelectedValue = Convert.ToInt32(r["VehicleID"]);
 
                     if (r["TechnicianID"] != DBNull.Value)
@@ -521,11 +513,137 @@ namespace AutoTrack.Forms
             catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
         }
 
+        private void ApplyRoleRestrictions()
+        {
+            string currentRole = SessionManager.CurrentUser?.Role ?? "";
+
+            if (currentRole == "SuperAdmin" || currentRole == "Admin")
+                return;
+
+            if (currentRole == "Staff")
+            {
+                txtLaborCost.ReadOnly = true;
+                txtPartsCost.ReadOnly = true;
+                txtDiscount.ReadOnly = true;
+
+                if (_edit)
+                {
+                    cboVehicle.Enabled = false;
+                    cboServiceType.Enabled = false;
+                    cboTech.Enabled = false;
+                    cboAssignedBy.Enabled = false;
+                    dtpDateIn.Enabled = false;
+                    dtpEstDate.Enabled = false;
+                    txtDescription.Enabled = false;
+                }
+
+                btnSave.Text = _edit ? "Update" : "Create Record";
+            }
+
+            if (currentRole == "Technician")
+            {
+                if (!_edit)
+                {
+                    MessageBox.Show("Technicians cannot create new service records.\nPlease contact an administrator.",
+                        "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    DialogResult = DialogResult.Cancel;
+                    return;
+                }
+
+                cboVehicle.Enabled = false;
+                cboServiceType.Enabled = false;
+                cboTech.Enabled = false;
+                cboAssignedBy.Enabled = false;
+                dtpDateIn.Enabled = false;
+                dtpEstDate.Enabled = false;
+                dtpDateCompleted.Enabled = false;
+                txtDescription.Enabled = false;
+                txtLaborCost.Enabled = false;
+                txtPartsCost.Enabled = false;
+                txtDiscount.Enabled = false;
+
+                cboStatus.Enabled = true;
+                txtNotes.Enabled = true;
+
+                btnSave.Visible = false;
+                btnCancel.Visible = false;
+                btnPrint.Visible = false;
+
+                AddTechnicianQuickButtons();
+            }
+        }
+
+        private void AddTechnicianQuickButtons()
+        {
+            int currentY = btnCancel.Top;
+            int labelX = 20;
+
+            // Start Job button
+            Button btnStartJob = new Button
+            {
+                Text = "▶ Start Job",
+                Location = new Point(labelX, currentY),
+                Size = new Size(100, 35),
+                BackColor = Color.FromArgb(46, 204, 113),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                Visible = cboStatus.Text == "Pending"
+            };
+            btnStartJob.FlatAppearance.BorderSize = 0;
+            btnStartJob.Click += (s, e) =>
+            {
+                cboStatus.Text = "InProgress";
+                Save(s, e);
+                DialogResult = DialogResult.OK;  // Close form after saving
+            };
+
+            // Update Status button (for manual status changes)
+            Button btnUpdateStatus = new Button
+            {
+                Text = "Update Status",
+                Location = new Point(labelX + 120, currentY),
+                Size = new Size(110, 35),
+                BackColor = Color.FromArgb(224, 123, 36),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnUpdateStatus.FlatAppearance.BorderSize = 0;
+            btnUpdateStatus.Click += (s, e) =>
+            {
+                Save(s, e);
+                DialogResult = DialogResult.OK;  // Close form after saving
+            };
+
+            // Close button
+            Button btnClose = new Button
+            {
+                Text = "Close",
+                Location = new Point(labelX + 240, currentY),
+                Size = new Size(80, 35),
+                BackColor = Color.FromArgb(220, 220, 220),
+                ForeColor = Color.FromArgb(60, 60, 60),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnClose.Click += (s, e) => DialogResult = DialogResult.Cancel;
+
+            // Update button visibility when status changes
+            cboStatus.SelectedIndexChanged += (statusSender, statusE) =>
+            {
+                btnStartJob.Visible = cboStatus.Text == "Pending";
+            };
+
+            Controls.Add(btnStartJob);
+            Controls.Add(btnUpdateStatus);
+            Controls.Add(btnClose);
+        }
+
         private void BtnPrint_Click(object sender, EventArgs e)
         {
             try
             {
-                // Get service data with ALL columns including prices
                 DataTable serviceDt = DatabaseHelper.ExecuteQuery(
                     "SELECT ServiceID, JobOrderNo, ServiceType, Status, DateIn, Notes, " +
                     "LaborCost, PartsCost, Discount, TotalCost, FinalAmount " +
@@ -538,7 +656,6 @@ namespace AutoTrack.Forms
                     return;
                 }
 
-                // Get vehicle and customer data
                 DataTable vehicleDt = DatabaseHelper.ExecuteQuery(
                     "SELECT v.Make, v.Model, v.PlateNumber, c.FirstName, c.LastName, c.Phone, c.Email " +
                     "FROM ServiceRecords s " +
@@ -553,7 +670,6 @@ namespace AutoTrack.Forms
                     return;
                 }
 
-                // Create payment row
                 DataTable paymentDt = new DataTable();
                 paymentDt.Columns.Add("PaymentMethod");
                 paymentDt.Columns.Add("Amount");
@@ -566,7 +682,6 @@ namespace AutoTrack.Forms
                 paymentRow["Status"] = "Paid";
                 paymentDt.Rows.Add(paymentRow);
 
-                // Print the invoice with PREVIEW
                 PrintHelper printHelper = new PrintHelper();
                 printHelper.PrintServiceInvoice(
                     serviceDt.Rows[0],
@@ -582,7 +697,6 @@ namespace AutoTrack.Forms
 
         private void SetupNumericValidation()
         {
-            // Labor Cost validation
             txtLaborCost.KeyPress += (s, e) =>
             {
                 if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '.')
@@ -601,7 +715,6 @@ namespace AutoTrack.Forms
                 CalculateTotal(null, null);
             };
 
-            // Parts Cost validation
             txtPartsCost.KeyPress += (s, e) =>
             {
                 if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '.')
@@ -620,7 +733,6 @@ namespace AutoTrack.Forms
                 CalculateTotal(null, null);
             };
 
-            // Discount validation (only whole numbers or decimals)
             txtDiscount.KeyPress += (s, e) =>
             {
                 if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '.')
@@ -639,11 +751,51 @@ namespace AutoTrack.Forms
                 CalculateTotal(null, null);
             };
         }
+
         private void Save(object sender, EventArgs e)
         {
-            // ========== VALIDATION ==========
+            string currentRole = SessionManager.CurrentUser?.Role ?? "";
 
-            // 1. Check Vehicle
+            if (currentRole == "Technician" && _edit)
+            {
+                try
+                {
+                    DatabaseHelper.ExecuteNonQuery(
+                        @"UPDATE ServiceRecords 
+                          SET Status = @Status, 
+                              Notes = @Notes,
+                              DateCompleted = @DateCompleted,
+                              UpdatedAt = GETDATE() 
+                          WHERE ServiceID = @ID",
+                        new SqlParameter[]
+                        {
+                            new SqlParameter("@Status", cboStatus.Text),
+                            new SqlParameter("@Notes", txtNotes.Text),
+                            new SqlParameter("@DateCompleted",
+                                cboStatus.Text == "Completed" ? (object)DateTime.Now : DBNull.Value),
+                            new SqlParameter("@ID", _id)
+                        });
+
+                    if (cboStatus.Text == "Completed" || cboStatus.Text == "Cancelled")
+                    {
+                        DatabaseHelper.ExecuteNonQuery(
+                            "UPDATE Technicians SET IsAvailable = 1 WHERE TechnicianID = (SELECT TechnicianID FROM ServiceRecords WHERE ServiceID = @ID)",
+                            new[] { new SqlParameter("@ID", _id) });
+                    }
+
+                    MessageBox.Show("Status updated successfully!", "Success",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    DialogResult = DialogResult.OK;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error updating status: " + ex.Message, "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                return;
+            }
+
+            // Validation and save for other roles...
             if (cboVehicle.SelectedIndex == -1 || cboVehicle.SelectedValue == null)
             {
                 MessageBox.Show("Please select a vehicle.", "Validation Required",
@@ -652,7 +804,6 @@ namespace AutoTrack.Forms
                 return;
             }
 
-            // 2. Check Service Type
             if (cboServiceType.SelectedIndex == -1 || string.IsNullOrWhiteSpace(cboServiceType.Text))
             {
                 MessageBox.Show("Please select a service type.", "Validation Required",
@@ -661,7 +812,6 @@ namespace AutoTrack.Forms
                 return;
             }
 
-            // 3. Check Status
             if (cboStatus.SelectedIndex == -1 || string.IsNullOrWhiteSpace(cboStatus.Text))
             {
                 MessageBox.Show("Please select a status.", "Validation Required",
@@ -670,7 +820,6 @@ namespace AutoTrack.Forms
                 return;
             }
 
-            // 4. Check Assigned By
             if (cboAssignedBy.SelectedIndex == -1 || cboAssignedBy.SelectedValue == null)
             {
                 MessageBox.Show("Please select who assigned this service.", "Validation Required",
@@ -679,16 +828,6 @@ namespace AutoTrack.Forms
                 return;
             }
 
-            // 5. Check Date In
-            if (dtpDateIn.Value == null)
-            {
-                MessageBox.Show("Please enter a valid Date In.",
-                    "Validation Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                dtpDateIn.Focus();
-                return;
-            }
-
-            // 6. Check Labor Cost
             if (!decimal.TryParse(txtLaborCost.Text, out decimal labor) || labor < 0)
             {
                 MessageBox.Show("Labor Cost must be a valid number (0 or greater).",
@@ -698,7 +837,6 @@ namespace AutoTrack.Forms
                 return;
             }
 
-            // 7. Check Parts Cost
             if (!decimal.TryParse(txtPartsCost.Text, out decimal parts) || parts < 0)
             {
                 MessageBox.Show("Parts Cost must be a valid number (0 or greater).",
@@ -708,7 +846,6 @@ namespace AutoTrack.Forms
                 return;
             }
 
-            // 8. Check Discount
             if (!decimal.TryParse(txtDiscount.Text, out decimal discount) || discount < 0)
             {
                 MessageBox.Show("Discount must be a valid number (0 or greater).",
@@ -718,11 +855,9 @@ namespace AutoTrack.Forms
                 return;
             }
 
-            // 9. Calculate totals
             decimal total = labor + parts;
             decimal finalAmount = total - discount;
 
-            // 10. Check if discount exceeds total
             if (discount > total)
             {
                 MessageBox.Show($"Discount cannot exceed total amount (₱{total:N2}).",
@@ -731,7 +866,6 @@ namespace AutoTrack.Forms
                 return;
             }
 
-            // 11. Check Date logic
             if (dtpEstDate.Value < dtpDateIn.Value)
             {
                 DialogResult result = MessageBox.Show(
@@ -751,13 +885,9 @@ namespace AutoTrack.Forms
                 dtpDateCompleted.Focus();
                 return;
             }
-            SetupNumericValidation();
-
-            // ========== SAVE DATA ==========
 
             try
             {
-                // Get old technician ID for update (to update availability)
                 object oldTechID = null;
                 if (_edit)
                 {
@@ -768,14 +898,12 @@ namespace AutoTrack.Forms
                         oldTechID = oldData.Rows[0]["TechnicianID"];
                 }
 
-                // Get ServiceTypeID
                 object serviceTypeId = DBNull.Value;
                 if (cboServiceType.SelectedValue != null)
                 {
                     serviceTypeId = cboServiceType.SelectedValue;
                 }
 
-                // Get other values
                 object techID = DBNull.Value;
                 if (cboTech.SelectedItem != null && cboTech.Text != "— Unassigned —")
                 {
@@ -793,36 +921,35 @@ namespace AutoTrack.Forms
                 if (_edit)
                 {
                     SqlParameter[] updateParams = {
-                new SqlParameter("@VID", cboVehicle.SelectedValue),
-                new SqlParameter("@TID", techID),
-                new SqlParameter("@AssignedBy", assignedBy),
-                new SqlParameter("@Desc", txtDescription.Text.Trim()),
-                new SqlParameter("@Type", cboServiceType.Text.Trim()),
-                new SqlParameter("@ServiceTypeID", serviceTypeId),
-                new SqlParameter("@Status", cboStatus.Text),
-                new SqlParameter("@DIn", dtpDateIn.Value.Date),
-                new SqlParameter("@DEst", dtpEstDate.Value.Date),
-                new SqlParameter("@DCompleted", dateCompleted),
-                new SqlParameter("@Notes", txtNotes.Text.Trim()),
-                new SqlParameter("@LaborCost", labor),
-                new SqlParameter("@PartsCost", parts),
-                new SqlParameter("@Discount", discount),
-                new SqlParameter("@TotalCost", total),
-                new SqlParameter("@FinalAmount", finalAmount),
-                new SqlParameter("@ID", _id)
-            };
+                        new SqlParameter("@VID", cboVehicle.SelectedValue),
+                        new SqlParameter("@TID", techID),
+                        new SqlParameter("@AssignedBy", assignedBy),
+                        new SqlParameter("@Desc", txtDescription.Text.Trim()),
+                        new SqlParameter("@Type", cboServiceType.Text.Trim()),
+                        new SqlParameter("@ServiceTypeID", serviceTypeId),
+                        new SqlParameter("@Status", cboStatus.Text),
+                        new SqlParameter("@DIn", dtpDateIn.Value.Date),
+                        new SqlParameter("@DEst", dtpEstDate.Value.Date),
+                        new SqlParameter("@DCompleted", dateCompleted),
+                        new SqlParameter("@Notes", txtNotes.Text.Trim()),
+                        new SqlParameter("@LaborCost", labor),
+                        new SqlParameter("@PartsCost", parts),
+                        new SqlParameter("@Discount", discount),
+                        new SqlParameter("@TotalCost", total),
+                        new SqlParameter("@FinalAmount", finalAmount),
+                        new SqlParameter("@ID", _id)
+                    };
 
                     DatabaseHelper.ExecuteNonQuery(@"
-                UPDATE ServiceRecords 
-                SET VehicleID=@VID, TechnicianID=@TID, AssignedBy=@AssignedBy,
-                    Description=@Desc, ServiceType=@Type, ServiceTypeID=@ServiceTypeID,
-                    Status=@Status, DateIn=@DIn, EstimatedDate=@DEst, DateCompleted=@DCompleted,
-                    Notes=@Notes, LaborCost=@LaborCost, PartsCost=@PartsCost,
-                    Discount=@Discount, TotalCost=@TotalCost, FinalAmount=@FinalAmount,
-                    UpdatedAt=GETDATE() 
-                WHERE ServiceID=@ID", updateParams);
+                        UPDATE ServiceRecords 
+                        SET VehicleID=@VID, TechnicianID=@TID, AssignedBy=@AssignedBy,
+                            Description=@Desc, ServiceType=@Type, ServiceTypeID=@ServiceTypeID,
+                            Status=@Status, DateIn=@DIn, EstimatedDate=@DEst, DateCompleted=@DCompleted,
+                            Notes=@Notes, LaborCost=@LaborCost, PartsCost=@PartsCost,
+                            Discount=@Discount, TotalCost=@TotalCost, FinalAmount=@FinalAmount,
+                            UpdatedAt=GETDATE() 
+                        WHERE ServiceID=@ID", updateParams);
 
-                    // Update technician availability
                     string newStatus = cboStatus.Text;
                     if (newStatus == "Completed" || newStatus == "Cancelled")
                     {
@@ -832,7 +959,6 @@ namespace AutoTrack.Forms
                                 "UPDATE Technicians SET IsAvailable = 1 WHERE TechnicianID = @TechID",
                                 new[] { new SqlParameter("@TechID", techID) });
                         }
-                        // Also free up the old technician if they were assigned
                         if (oldTechID != null && oldTechID != DBNull.Value && !oldTechID.Equals(techID))
                         {
                             DatabaseHelper.ExecuteNonQuery(
@@ -864,34 +990,34 @@ namespace AutoTrack.Forms
                     string jobOrderNo = $"JO-{DateTime.Now:yyyyMMdd}-{new Random().Next(1000, 9999)}";
 
                     SqlParameter[] insertParams = {
-                new SqlParameter("@JobNo", jobOrderNo),
-                new SqlParameter("@VID", cboVehicle.SelectedValue),
-                new SqlParameter("@TID", techID),
-                new SqlParameter("@AssignedBy", assignedBy),
-                new SqlParameter("@Desc", txtDescription.Text.Trim()),
-                new SqlParameter("@Type", cboServiceType.Text.Trim()),
-                new SqlParameter("@ServiceTypeID", serviceTypeId),
-                new SqlParameter("@Status", cboStatus.Text),
-                new SqlParameter("@DIn", dtpDateIn.Value.Date),
-                new SqlParameter("@DEst", dtpEstDate.Value.Date),
-                new SqlParameter("@DCompleted", dateCompleted),
-                new SqlParameter("@Notes", txtNotes.Text.Trim()),
-                new SqlParameter("@LaborCost", labor),
-                new SqlParameter("@PartsCost", parts),
-                new SqlParameter("@Discount", discount),
-                new SqlParameter("@TotalCost", total),
-                new SqlParameter("@FinalAmount", finalAmount)
-            };
+                        new SqlParameter("@JobNo", jobOrderNo),
+                        new SqlParameter("@VID", cboVehicle.SelectedValue),
+                        new SqlParameter("@TID", techID),
+                        new SqlParameter("@AssignedBy", assignedBy),
+                        new SqlParameter("@Desc", txtDescription.Text.Trim()),
+                        new SqlParameter("@Type", cboServiceType.Text.Trim()),
+                        new SqlParameter("@ServiceTypeID", serviceTypeId),
+                        new SqlParameter("@Status", cboStatus.Text),
+                        new SqlParameter("@DIn", dtpDateIn.Value.Date),
+                        new SqlParameter("@DEst", dtpEstDate.Value.Date),
+                        new SqlParameter("@DCompleted", dateCompleted),
+                        new SqlParameter("@Notes", txtNotes.Text.Trim()),
+                        new SqlParameter("@LaborCost", labor),
+                        new SqlParameter("@PartsCost", parts),
+                        new SqlParameter("@Discount", discount),
+                        new SqlParameter("@TotalCost", total),
+                        new SqlParameter("@FinalAmount", finalAmount)
+                    };
 
                     DatabaseHelper.ExecuteNonQuery(@"
-                INSERT INTO ServiceRecords(
-                    JobOrderNo, VehicleID, TechnicianID, AssignedBy, Description,
-                    ServiceType, ServiceTypeID, Status, DateIn, EstimatedDate, DateCompleted,
-                    Notes, LaborCost, PartsCost, Discount, TotalCost, FinalAmount, CreatedAt, UpdatedAt) 
-                VALUES(
-                    @JobNo, @VID, @TID, @AssignedBy, @Desc,
-                    @Type, @ServiceTypeID, @Status, @DIn, @DEst, @DCompleted,
-                    @Notes, @LaborCost, @PartsCost, @Discount, @TotalCost, @FinalAmount, GETDATE(), GETDATE())", insertParams);
+                        INSERT INTO ServiceRecords(
+                            JobOrderNo, VehicleID, TechnicianID, AssignedBy, Description,
+                            ServiceType, ServiceTypeID, Status, DateIn, EstimatedDate, DateCompleted,
+                            Notes, LaborCost, PartsCost, Discount, TotalCost, FinalAmount, CreatedAt, UpdatedAt) 
+                        VALUES(
+                            @JobNo, @VID, @TID, @AssignedBy, @Desc,
+                            @Type, @ServiceTypeID, @Status, @DIn, @DEst, @DCompleted,
+                            @Notes, @LaborCost, @PartsCost, @Discount, @TotalCost, @FinalAmount, GETDATE(), GETDATE())", insertParams);
 
                     string newStatus = cboStatus.Text;
                     if ((newStatus == "Pending" || newStatus == "InProgress") && techID != DBNull.Value)
