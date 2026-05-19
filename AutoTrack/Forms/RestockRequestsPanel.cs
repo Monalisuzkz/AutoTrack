@@ -229,8 +229,22 @@ namespace AutoTrack.Forms
 
                 if (role == "Supplier")
                 {
-                    query += " AND p.SupplierID = (SELECT SupplierID FROM Suppliers WHERE ContactPerson = (SELECT FullName FROM Users WHERE UserID = @UserID))";
-                    paramList.Add(new SqlParameter("@UserID", userId));
+                    object supplierIdObj = DatabaseHelper.ExecuteScalar(@"
+                        SELECT SupplierID
+                        FROM Suppliers
+                        WHERE ContactPerson = (SELECT FullName FROM Users WHERE UserID = @UserID)",
+                        new[] { new SqlParameter("@UserID", userId) });
+
+                    int supplierId = supplierIdObj != null ? Convert.ToInt32(supplierIdObj) : 0;
+                    if (supplierId > 0)
+                    {
+                        query += " AND p.SupplierID = @SupplierID";
+                        paramList.Add(new SqlParameter("@SupplierID", supplierId));
+                    }
+                    else
+                    {
+                        query += " AND 1=0";
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(statusFilter))
