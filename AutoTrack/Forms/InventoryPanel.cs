@@ -35,13 +35,10 @@ namespace AutoTrack.Forms
             // For Staff role - disable Archive button
             if (_userRole.Equals("Staff", StringComparison.OrdinalIgnoreCase))
             {
-                // Disable Archive button (gray out)
+                // Hide Archive button completely
                 if (btnArchive != null)
                 {
-                    btnArchive.Enabled = false;
-                    btnArchive.BackColor = Color.FromArgb(200, 200, 200);
-                    btnArchive.ForeColor = Color.FromArgb(100, 100, 100);
-                    btnArchive.Text = "📦 Archive (Locked)";
+                    btnArchive.Visible = false;
                 }
 
                 // Keep Add and Edit buttons enabled
