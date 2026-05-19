@@ -25,7 +25,9 @@ namespace AutoTrack.Forms
 
         private void Init()
         {
-            Dock = DockStyle.Fill; BackColor = Color.FromArgb(245, 245, 245);
+            Dock = DockStyle.Fill;
+            BackColor = Color.FromArgb(245, 245, 245);
+
             txtSearch = MakeSearchBox("Search suppliers...");
             btnSearch = MakeButton("Search", Color.FromArgb(60, 60, 60), 80, 32);
             btnAdd = MakeButton("+ Add", Color.FromArgb(224, 123, 36), 90, 34);
@@ -41,9 +43,12 @@ namespace AutoTrack.Forms
             btnRefresh.Click += (s, e) => LoadData();
             txtSearch.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) LoadData(txtSearch.Text); };
 
-            dgv = CreateGrid(); dgv.DoubleClick += EditClick;
+            dgv = CreateGrid();
+            dgv.DoubleClick += EditClick;
             Controls.Add(dgv);
-            Controls.Add(BuildToolbar("Suppliers", txtSearch, btnSearch, btnAdd, btnEdit, btnDelete, btnRefresh, lblCount));
+
+            Controls.Add(BuildToolbar("Suppliers",
+                txtSearch, btnSearch, btnAdd, btnEdit, btnDelete, btnRefresh, lblCount));
         }
 
         private void LoadData(string search = "")
@@ -56,16 +61,18 @@ namespace AutoTrack.Forms
 
                 var paramList = new System.Collections.Generic.List<SqlParameter>();
 
-                // If supplier mode, only show their own info
+                // Supplier mode: only see their info
                 if (_supplierMode && _userId > 0)
                 {
                     q += " WHERE ContactPerson = (SELECT FullName FROM Users WHERE UserID = @UserID)";
                     paramList.Add(new SqlParameter("@UserID", _userId));
                 }
 
+                // Search box filter
                 if (!string.IsNullOrEmpty(search))
                 {
-                    q += (q.Contains("WHERE") ? " AND" : " WHERE") + " (CompanyName LIKE @S OR ContactPerson LIKE @S OR PartsSupplied LIKE @S)";
+                    q += (q.Contains("WHERE") ? " AND" : " WHERE") +
+                         " (CompanyName LIKE @S OR ContactPerson LIKE @S OR PartsSupplied LIKE @S)";
                     paramList.Add(new SqlParameter("@S", "%" + search + "%"));
                 }
                 q += " ORDER BY CompanyName";
@@ -77,30 +84,89 @@ namespace AutoTrack.Forms
                     dgv.DataSource = null;
                     dgv.DataSource = dt;
                     HideColumns();
+                    if (_supplierMode)
+                    {
+                        dgv.ReadOnly = true;
+                        dgv.DoubleClick -= EditClick;
+                    }
                 }
 
                 lblCount.Text = $"{dt.Rows.Count} record(s) found";
 
-                // If supplier mode, restrict editing
                 if (_supplierMode)
                 {
-                    btnAdd.Visible = false;
-                    btnDelete.Visible = false;
+                    ApplySupplierUI();
+                }
+                else
+                {
+                    ApplyAdminUI();
                 }
             }
-            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Hide controls and disable edit for supplier self-service mode.
+        /// </summary>
+        private void ApplySupplierUI()
+        {
+            btnAdd.Visible = false;
+            btnDelete.Visible = false;
+            btnEdit.Visible = false;
+            btnRefresh.Visible = false;
+            btnSearch.Visible = false;
+            txtSearch.Visible = false;
+            lblCount.Visible = true;
+            if (dgv != null)
+            {
+                dgv.ReadOnly = true;
+                dgv.DoubleClick -= EditClick;
+            }
+        }
+
+        /// <summary>
+        /// Restore all controls for admin/staff.
+        /// </summary>
+        private void ApplyAdminUI()
+        {
+            btnAdd.Visible = true;
+            btnDelete.Visible = true;
+            btnEdit.Visible = true;
+            btnRefresh.Visible = true;
+            btnSearch.Visible = true;
+            txtSearch.Visible = true;
+            lblCount.Visible = true;
+            if (dgv != null)
+            {
+                dgv.ReadOnly = false;
+                dgv.DoubleClick -= EditClick; // Remove in case added multiple
+                dgv.DoubleClick += EditClick;
+            }
         }
 
         private void EditClick(object sender, EventArgs e)
         {
-            if (dgv.SelectedRows.Count == 0) { MessageBox.Show("Select a supplier to edit.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (dgv.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("Select a supplier to edit.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             int id = Convert.ToInt32(dgv.SelectedRows[0].Cells["SupplierID"].Value);
-            var f = new SupplierForm(id); if (f.ShowDialog() == DialogResult.OK) LoadData();
+            var f = new SupplierForm(id);
+            if (f.ShowDialog() == DialogResult.OK)
+                LoadData();
         }
 
         private void DeleteClick(object sender, EventArgs e)
         {
-            if (dgv.SelectedRows.Count == 0) { MessageBox.Show("Select a supplier to delete.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (dgv.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("Select a supplier to delete.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             string name = dgv.SelectedRows[0].Cells["Company"].Value?.ToString();
             if (MessageBox.Show($"Delete '{name}'?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
             {
@@ -110,7 +176,10 @@ namespace AutoTrack.Forms
                     DatabaseHelper.ExecuteNonQuery("DELETE FROM Suppliers WHERE SupplierID=@ID", new[] { new SqlParameter("@ID", id) });
                     LoadData();
                 }
-                catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
     }

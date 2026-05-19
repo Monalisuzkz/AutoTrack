@@ -15,16 +15,81 @@ namespace AutoTrack.Forms
         private Button btnSearch, btnUnarchive, btnRefresh;
         private DataGridView dgv;
         private Label lblCount;
+        private Label lblReadOnlyMessage;
+        private string _currentUserRole;
 
         public ArchivedInventoryPanel()
         {
+            _currentUserRole = SessionManager.CurrentUser?.Role ?? "";
             InitializeControls();
+            ApplyRolePermissions();
             LoadData();
         }
 
         public void RefreshData()
         {
             LoadData();
+        }
+
+        private void ApplyRolePermissions()
+        {
+            // For Staff role - hide unarchive button and make grid read-only
+            if (_currentUserRole.Equals("Staff", StringComparison.OrdinalIgnoreCase))
+            {
+                // Hide the unarchive button
+                if (btnUnarchive != null)
+                {
+                    btnUnarchive.Visible = false;
+                }
+
+                // Add read-only message label
+                if (lblReadOnlyMessage == null)
+                {
+                    lblReadOnlyMessage = new Label
+                    {
+                        Text = "🔒 View Only Mode - You cannot unarchive items",
+                        ForeColor = Color.FromArgb(180, 80, 80),
+                        Font = new Font("Segoe UI", 9f, FontStyle.Italic),
+                        AutoSize = true,
+                        Location = new Point(350, 8),
+                        BackColor = Color.Transparent
+                    };
+                    this.Controls.Add(lblReadOnlyMessage);
+
+                    // Position it after the toolbar
+                    lblReadOnlyMessage.BringToFront();
+                }
+                else
+                {
+                    lblReadOnlyMessage.Visible = true;
+                }
+
+                // Make grid read-only to prevent any editing
+                if (dgv != null)
+                {
+                    dgv.ReadOnly = true;
+                    dgv.AllowUserToAddRows = false;
+                    dgv.AllowUserToDeleteRows = false;
+                }
+            }
+            else
+            {
+                // For other roles, make sure unarchive button is visible
+                if (btnUnarchive != null)
+                {
+                    btnUnarchive.Visible = true;
+                }
+
+                if (lblReadOnlyMessage != null)
+                {
+                    lblReadOnlyMessage.Visible = false;
+                }
+
+                if (dgv != null)
+                {
+                    dgv.ReadOnly = false;
+                }
+            }
         }
 
         private void InitializeControls()
@@ -53,7 +118,17 @@ namespace AutoTrack.Forms
                 }
             };
 
-            dgv.DoubleClick += (s, e) => UnarchiveSelected();
+            dgv.DoubleClick += (s, e) =>
+            {
+                // Prevent double-click unarchive for Staff
+                if (_currentUserRole.Equals("Staff", StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show("Staff accounts cannot unarchive items. View only.",
+                        "Access Restricted", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                UnarchiveSelected();
+            };
 
             Controls.Add(dgv);
             Controls.Add(BuildToolbar("Archived Items", txtSearch, btnSearch, btnUnarchive, btnRefresh, lblCount));
@@ -90,6 +165,12 @@ namespace AutoTrack.Forms
                     dgv.DataSource = null;
                     dgv.DataSource = dt;
                     HideColumns();
+
+                    // Re-apply read-only for Staff after data load
+                    if (_currentUserRole.Equals("Staff", StringComparison.OrdinalIgnoreCase))
+                    {
+                        dgv.ReadOnly = true;
+                    }
                 }
 
                 lblCount.Text = $"{dgv.RowCount} archived item(s) found";
@@ -99,11 +180,26 @@ namespace AutoTrack.Forms
 
         private void UnarchiveClick(object sender, EventArgs e)
         {
+            // Check role before allowing unarchive
+            if (_currentUserRole.Equals("Staff", StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show("Staff accounts cannot unarchive items.",
+                    "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             UnarchiveSelected();
         }
 
         private void UnarchiveSelected()
         {
+            // Double-check role at execution time
+            if (_currentUserRole.Equals("Staff", StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show("Staff accounts cannot unarchive items.",
+                    "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             if (dgv.SelectedRows.Count == 0)
             {
                 MessageBox.Show("Select an item to unarchive.", "No Selection",

@@ -54,7 +54,9 @@ namespace AutoTrack.Forms
 
             lblName = Lbl("Full Name", 20, 56); txtName = Txt(20, 76);
             lblUser = Lbl("Username", 20, 116); txtUser = Txt(20, 136, 170);
-            lblPass = Lbl(_edit ? "New Password (optional)" : "Password", 210, 116); txtPass = Txt(210, 136, 170);
+            // FIXED: Show "New Password (optional)" when editing, "Password" when adding
+            lblPass = Lbl(_edit ? "New Password (optional)" : "Password", 210, 116);
+            txtPass = Txt(210, 136, 170);
             txtPass.PasswordChar = '●';
 
             lblRole = Lbl("Role", 20, 176);
@@ -66,7 +68,7 @@ namespace AutoTrack.Forms
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(245, 245, 245)
             };
-            cboRole.Items.AddRange(new object[] {"Admin", "Staff", "Technician", "Supplier" });
+            cboRole.Items.AddRange(new object[] { "Admin", "Staff", "Technician", "Supplier" });
             cboRole.SelectedIndex = 1;
 
             chkActive = new CheckBox
@@ -118,8 +120,11 @@ namespace AutoTrack.Forms
                 if (dt.Rows.Count > 0)
                 {
                     DataRow r = dt.Rows[0];
-                    txtName.Text = r["FullName"].ToString(); txtUser.Text = r["Username"].ToString();
-                    txtPass.Text = string.Empty; cboRole.Text = r["Role"].ToString();
+                    txtName.Text = r["FullName"].ToString();
+                    txtUser.Text = r["Username"].ToString();
+                    // FIXED: Don't load password - clear it for security
+                    txtPass.Text = string.Empty;
+                    cboRole.Text = r["Role"].ToString();
                     chkActive.Checked = Convert.ToBoolean(r["IsActive"]);
                 }
             }
@@ -128,52 +133,74 @@ namespace AutoTrack.Forms
 
         private void Save(object sender, EventArgs e)
         {
+            // FIXED: Validation logic
             if (string.IsNullOrWhiteSpace(txtName.Text) || string.IsNullOrWhiteSpace(txtUser.Text))
             {
-                MessageBox.Show("Full name and username are required.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning); return;
+                MessageBox.Show("Full name and username are required.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
 
+            // For new users, password is required
             if (!_edit && string.IsNullOrWhiteSpace(txtPass.Text))
             {
-                MessageBox.Show("Password is required for new users.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning); return;
+                MessageBox.Show("Password is required for new users.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
+
             try
             {
                 if (_edit)
                 {
+                    // Check if user entered a new password
                     bool hasNewPassword = !string.IsNullOrWhiteSpace(txtPass.Text);
-                    string updateQuery = hasNewPassword
-                        ? "UPDATE Users SET FullName=@Name,Username=@User,Password=@Pass,Role=@Role,IsActive=@Active,UpdatedAt=GETDATE() WHERE UserID=@ID"
-                        : "UPDATE Users SET FullName=@Name,Username=@User,Role=@Role,IsActive=@Active,UpdatedAt=GETDATE() WHERE UserID=@ID";
 
-                    var updateParams = hasNewPassword
-                        ? new SqlParameter[]
-                        {
-                            new SqlParameter("@Name", txtName.Text.Trim()),
-                            new SqlParameter("@User", txtUser.Text.Trim()),
-                            new SqlParameter("@Pass", PasswordHelper.HashPassword(txtPass.Text)),
-                            new SqlParameter("@Role", cboRole.Text),
-                            new SqlParameter("@Active", chkActive.Checked ? 1 : 0),
-                            new SqlParameter("@ID", _id)
-                        }
-                        : new SqlParameter[]
-                        {
-                            new SqlParameter("@Name", txtName.Text.Trim()),
-                            new SqlParameter("@User", txtUser.Text.Trim()),
-                            new SqlParameter("@Role", cboRole.Text),
-                            new SqlParameter("@Active", chkActive.Checked ? 1 : 0),
-                            new SqlParameter("@ID", _id)
-                        };
-
-                    DatabaseHelper.ExecuteNonQuery(updateQuery, updateParams);
+                    if (hasNewPassword)
+                    {
+                        // Update including password
+                        DatabaseHelper.ExecuteNonQuery(
+                            "UPDATE Users SET FullName=@Name, Username=@User, Password=@Pass, Role=@Role, IsActive=@Active, UpdatedAt=GETDATE() WHERE UserID=@ID",
+                            new SqlParameter[]
+                            {
+                                new SqlParameter("@Name", txtName.Text.Trim()),
+                                new SqlParameter("@User", txtUser.Text.Trim()),
+                                new SqlParameter("@Pass", PasswordHelper.HashPassword(txtPass.Text)),
+                                new SqlParameter("@Role", cboRole.Text),
+                                new SqlParameter("@Active", chkActive.Checked ? 1 : 0),
+                                new SqlParameter("@ID", _id)
+                            });
+                    }
+                    else
+                    {
+                        // Update without changing password
+                        DatabaseHelper.ExecuteNonQuery(
+                            "UPDATE Users SET FullName=@Name, Username=@User, Role=@Role, IsActive=@Active, UpdatedAt=GETDATE() WHERE UserID=@ID",
+                            new SqlParameter[]
+                            {
+                                new SqlParameter("@Name", txtName.Text.Trim()),
+                                new SqlParameter("@User", txtUser.Text.Trim()),
+                                new SqlParameter("@Role", cboRole.Text),
+                                new SqlParameter("@Active", chkActive.Checked ? 1 : 0),
+                                new SqlParameter("@ID", _id)
+                            });
+                    }
                 }
                 else
                 {
-                    object exists = DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM Users WHERE Username=@User", new[] { new SqlParameter("@User", txtUser.Text.Trim()) });
-                    if (Convert.ToInt32(exists) > 0) { MessageBox.Show("Username already exists.", "Duplicate", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+                    // Check for duplicate username
+                    object exists = DatabaseHelper.ExecuteScalar(
+                        "SELECT COUNT(*) FROM Users WHERE Username=@User",
+                        new[] { new SqlParameter("@User", txtUser.Text.Trim()) });
+
+                    if (Convert.ToInt32(exists) > 0)
+                    {
+                        MessageBox.Show("Username already exists.", "Duplicate", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    // Insert new user with hashed password
                     DatabaseHelper.ExecuteNonQuery(
-                        "INSERT INTO Users(FullName,Username,Password,Role,IsActive) VALUES(@Name,@User,@Pass,@Role,@Active)",
-                        new[]
+                        "INSERT INTO Users(FullName, Username, Password, Role, IsActive) VALUES(@Name, @User, @Pass, @Role, @Active)",
+                        new SqlParameter[]
                         {
                             new SqlParameter("@Name", txtName.Text.Trim()),
                             new SqlParameter("@User", txtUser.Text.Trim()),
@@ -182,10 +209,14 @@ namespace AutoTrack.Forms
                             new SqlParameter("@Active", chkActive.Checked ? 1 : 0)
                         });
                 }
+
                 MessageBox.Show(_edit ? "User updated!" : "User added!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 DialogResult = DialogResult.OK;
             }
-            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }

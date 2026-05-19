@@ -97,7 +97,7 @@ namespace AutoTrack.Forms
             this.panelTopBar.BackColor = Color.FromArgb(20, 20, 20);
 
             // AutoTrack Title
-            this.lblAppTitle.Text = "⚙  AutoTrack";
+            this.lblAppTitle.Text = "AutoTrack";
             this.lblAppTitle.Font = new Font("Segoe UI", 13f, FontStyle.Bold);
             this.lblAppTitle.ForeColor = Color.White;
             this.lblAppTitle.Location = new Point(16, 14);
@@ -265,7 +265,7 @@ namespace AutoTrack.Forms
             // ════════════════════════════════════════════════════
             // DASHBOARD PANEL CONTROLS
             // ════════════════════════════════════════════════════
-            this.lblDashTitle.Text = $"Dashboard - Welcome back, {SessionManager.CurrentUser?.FullName ?? "User"}!";
+            this.lblDashTitle.Text = "Dashboard - Welcome back!";
             this.lblDashTitle.Font = new Font("Segoe UI", 16f, FontStyle.Bold);
             this.lblDashTitle.ForeColor = Color.FromArgb(30, 30, 30);
             this.lblDashTitle.Location = new Point(0, 0);

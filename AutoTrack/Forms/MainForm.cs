@@ -246,6 +246,7 @@ namespace AutoTrack.Forms
             btnServices.Visible = true;
             btnInventory.Visible = true;
             btnPayments.Visible = true;
+            btnArchivedItems.Visible = true;
         }
 
         private void ShowTechnicianMenu()
@@ -453,7 +454,7 @@ namespace AutoTrack.Forms
                 {
                     case "Staff":
                         dashboard = new StaffDashboard();
-                        panelDashboard.AutoScrollMinSize = new Size(0, 750);  // Staff height
+                        panelDashboard.AutoScrollMinSize = new Size(0, 940);  // Staff height
                         break;
                     case "Technician":
                         dashboard = new TechnicianDashboard();
@@ -461,7 +462,7 @@ namespace AutoTrack.Forms
                         break;
                     case "Supplier":
                         dashboard = new SupplierDashboard();
-                        panelDashboard.AutoScrollMinSize = new Size(0, 750);  // Supplier height
+                        panelDashboard.AutoScrollMinSize = new Size(0, 720);  // Supplier height
                         break;
                     default:
                         SetDesignerControlsVisibility(true);
@@ -1122,7 +1123,8 @@ namespace AutoTrack.Forms
             LoadRoleSpecificDashboard();
             SetupNotificationBell();
             NotificationHelper.RunScheduledChecks();
-
+            string userName = SessionManager.CurrentUser?.FullName ?? "User";
+            lblDashTitle.Text = $"Dashboard - Welcome back, {userName}!";
             // Force sidebar reposition after form is fully loaded
             this.BeginInvoke(new Action(() =>
             {
