@@ -230,21 +230,16 @@ namespace AutoTrack.Forms
                 if (role == "Supplier")
                 {
                     object supplierIdObj = DatabaseHelper.ExecuteScalar(@"
-                        SELECT SupplierID
-                        FROM Suppliers
-                        WHERE ContactPerson = (SELECT FullName FROM Users WHERE UserID = @UserID)",
+                        SELECT s.SupplierID
+                        FROM Suppliers s
+                        INNER JOIN Users u ON s.ContactPerson = u.FullName
+                        WHERE u.UserID = @UserID",
                         new[] { new SqlParameter("@UserID", userId) });
 
-                    int supplierId = supplierIdObj != null ? Convert.ToInt32(supplierIdObj) : 0;
-                    if (supplierId > 0)
-                    {
-                        query += " AND p.SupplierID = @SupplierID";
-                        paramList.Add(new SqlParameter("@SupplierID", supplierId));
-                    }
-                    else
-                    {
-                        query += " AND 1=0";
-                    }
+                    int supplierId;
+                    bool hasSupplierId = int.TryParse(supplierIdObj?.ToString(), out supplierId) && supplierId > 0;
+                    query += " AND p.SupplierID = @SupplierID";
+                    paramList.Add(new SqlParameter("@SupplierID", hasSupplierId ? supplierId : -1));
                 }
 
                 if (!string.IsNullOrEmpty(statusFilter))
