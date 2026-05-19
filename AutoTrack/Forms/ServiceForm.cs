@@ -12,10 +12,12 @@ namespace AutoTrack.Forms
     {
         private int _id = 0;
         private bool _edit = false;
+        private int _currentUserId = 0;
+        private string _currentUserRole = "";
 
         // Controls
         private Label lblTitle;
-        private ComboBox cboVehicle, cboTech, cboStatus, cboAssignedBy;
+        private ComboBox cboVehicle, cboTech, cboStatus;
         private ComboBox cboServiceType;
         private TextBox txtNotes, txtDescription;
         private TextBox txtLaborCost, txtPartsCost, txtDiscount;
@@ -27,18 +29,20 @@ namespace AutoTrack.Forms
         {
             _id = id;
             _edit = id > 0;
+            _currentUserId = SessionManager.CurrentUser?.UserID ?? 0;
+            _currentUserRole = SessionManager.CurrentUser?.Role ?? "";
+
             Init();
             LoadVehicles();
             LoadTechs();
             LoadServiceTypes();
-            LoadAssignedBy();
             if (_edit) LoadService();
         }
 
         private void Init()
         {
             Text = _edit ? "Edit Service Record" : "New Service Record";
-            Size = new Size(760, 680);
+            Size = new Size(760, 625);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -78,7 +82,10 @@ namespace AutoTrack.Forms
                 Size = new Size(480, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 200,
+                MaxDropDownItems = 10,
+                IntegralHeight = true
             };
             Controls.Add(lblVehicle);
             Controls.Add(cboVehicle);
@@ -106,13 +113,16 @@ namespace AutoTrack.Forms
                 Size = new Size(300, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 200,
+                MaxDropDownItems = 12,
+                IntegralHeight = true
             };
             Controls.Add(lblType);
             Controls.Add(cboServiceType);
             currentY += rowHeight;
 
-            // Row 4: Technician and Assigned By
+            // Row 4: Technician (no Assigned By field - removed)
             var lblTech = Lbl("Technician:", labelX, currentY);
             cboTech = new ComboBox
             {
@@ -120,22 +130,13 @@ namespace AutoTrack.Forms
                 Size = new Size(220, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
-            };
-
-            var lblAssigned = Lbl("Assigned By:", fieldX + 240, currentY);
-            cboAssignedBy = new ComboBox
-            {
-                Location = new Point(fieldX + 330, currentY - 3),
-                Size = new Size(200, 28),
-                Font = new Font("Segoe UI", 10f),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 150,
+                MaxDropDownItems = 8,
+                IntegralHeight = true
             };
             Controls.Add(lblTech);
             Controls.Add(cboTech);
-            Controls.Add(lblAssigned);
-            Controls.Add(cboAssignedBy);
             currentY += rowHeight;
 
             // Row 5: Status
@@ -146,7 +147,10 @@ namespace AutoTrack.Forms
                 Size = new Size(180, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 120,
+                MaxDropDownItems = 4,
+                IntegralHeight = true
             };
             cboStatus.Items.AddRange(new object[] { "Pending", "InProgress", "Completed", "Cancelled" });
             Controls.Add(lblStatus);
@@ -452,24 +456,6 @@ namespace AutoTrack.Forms
             }
         }
 
-        private void LoadAssignedBy()
-        {
-            try
-            {
-                DataTable dt = DatabaseHelper.ExecuteQuery(
-                    "SELECT UserID, FullName FROM Users WHERE IsActive = 1 AND Role IN ('Admin', 'SuperAdmin') ORDER BY FullName");
-                cboAssignedBy.DataSource = dt;
-                cboAssignedBy.DisplayMember = "FullName";
-                cboAssignedBy.ValueMember = "UserID";
-
-                if (dt.Rows.Count > 0)
-                {
-                    cboAssignedBy.SelectedIndex = -1;
-                }
-            }
-            catch (Exception ex) { MessageBox.Show("Error loading users: " + ex.Message); }
-        }
-
         private void LoadService()
         {
             try
@@ -484,9 +470,6 @@ namespace AutoTrack.Forms
 
                     if (r["TechnicianID"] != DBNull.Value)
                         cboTech.SelectedValue = Convert.ToInt32(r["TechnicianID"]);
-
-                    if (r["AssignedBy"] != DBNull.Value)
-                        cboAssignedBy.SelectedValue = Convert.ToInt32(r["AssignedBy"]);
 
                     txtDescription.Text = r["Description"].ToString();
                     cboServiceType.Text = r["ServiceType"].ToString();
@@ -515,12 +498,10 @@ namespace AutoTrack.Forms
 
         private void ApplyRoleRestrictions()
         {
-            string currentRole = SessionManager.CurrentUser?.Role ?? "";
-
-            if (currentRole == "SuperAdmin" || currentRole == "Admin")
+            if (_currentUserRole == "SuperAdmin" || _currentUserRole == "Admin")
                 return;
 
-            if (currentRole == "Staff")
+            if (_currentUserRole == "Staff")
             {
                 txtLaborCost.ReadOnly = true;
                 txtPartsCost.ReadOnly = true;
@@ -531,7 +512,6 @@ namespace AutoTrack.Forms
                     cboVehicle.Enabled = false;
                     cboServiceType.Enabled = false;
                     cboTech.Enabled = false;
-                    cboAssignedBy.Enabled = false;
                     dtpDateIn.Enabled = false;
                     dtpEstDate.Enabled = false;
                     txtDescription.Enabled = false;
@@ -540,7 +520,7 @@ namespace AutoTrack.Forms
                 btnSave.Text = _edit ? "Update" : "Create Record";
             }
 
-            if (currentRole == "Technician")
+            if (_currentUserRole == "Technician")
             {
                 if (!_edit)
                 {
@@ -553,7 +533,6 @@ namespace AutoTrack.Forms
                 cboVehicle.Enabled = false;
                 cboServiceType.Enabled = false;
                 cboTech.Enabled = false;
-                cboAssignedBy.Enabled = false;
                 dtpDateIn.Enabled = false;
                 dtpEstDate.Enabled = false;
                 dtpDateCompleted.Enabled = false;
@@ -595,10 +574,10 @@ namespace AutoTrack.Forms
             {
                 cboStatus.Text = "InProgress";
                 Save(s, e);
-                DialogResult = DialogResult.OK;  // Close form after saving
+                DialogResult = DialogResult.OK;
             };
 
-            // Update Status button (for manual status changes)
+            // Update Status button
             Button btnUpdateStatus = new Button
             {
                 Text = "Update Status",
@@ -613,7 +592,7 @@ namespace AutoTrack.Forms
             btnUpdateStatus.Click += (s, e) =>
             {
                 Save(s, e);
-                DialogResult = DialogResult.OK;  // Close form after saving
+                DialogResult = DialogResult.OK;
             };
 
             // Close button
@@ -629,7 +608,6 @@ namespace AutoTrack.Forms
             };
             btnClose.Click += (s, e) => DialogResult = DialogResult.Cancel;
 
-            // Update button visibility when status changes
             cboStatus.SelectedIndexChanged += (statusSender, statusE) =>
             {
                 btnStartJob.Visible = cboStatus.Text == "Pending";
@@ -754,9 +732,7 @@ namespace AutoTrack.Forms
 
         private void Save(object sender, EventArgs e)
         {
-            string currentRole = SessionManager.CurrentUser?.Role ?? "";
-
-            if (currentRole == "Technician" && _edit)
+            if (_currentUserRole == "Technician" && _edit)
             {
                 try
                 {
@@ -795,7 +771,7 @@ namespace AutoTrack.Forms
                 return;
             }
 
-            // Validation and save for other roles...
+            // Validation for other roles
             if (cboVehicle.SelectedIndex == -1 || cboVehicle.SelectedValue == null)
             {
                 MessageBox.Show("Please select a vehicle.", "Validation Required",
@@ -817,14 +793,6 @@ namespace AutoTrack.Forms
                 MessageBox.Show("Please select a status.", "Validation Required",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 cboStatus.DroppedDown = true;
-                return;
-            }
-
-            if (cboAssignedBy.SelectedIndex == -1 || cboAssignedBy.SelectedValue == null)
-            {
-                MessageBox.Show("Please select who assigned this service.", "Validation Required",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                cboAssignedBy.DroppedDown = true;
                 return;
             }
 
@@ -913,8 +881,8 @@ namespace AutoTrack.Forms
                     }
                 }
 
-                object assignedBy = (cboAssignedBy.SelectedValue == null || cboAssignedBy.SelectedValue == DBNull.Value)
-                    ? (object)DBNull.Value : cboAssignedBy.SelectedValue;
+                // Automatically set AssignedBy to current logged-in user
+                int assignedBy = _currentUserId;
 
                 object dateCompleted = dtpDateCompleted.Checked ? (object)dtpDateCompleted.Value.Date : DBNull.Value;
 

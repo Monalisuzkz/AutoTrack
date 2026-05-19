@@ -1,10 +1,12 @@
-using System;
-using System.Data;
-using System.Data.SqlClient;
-using System.Drawing;
-using System.Windows.Forms;
 using AutoTrack.Database;
 using AutoTrack.Helpers;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Diagnostics;
+using System.Drawing;
+using System.Windows.Forms;
 
 namespace AutoTrack.Forms
 {
@@ -16,18 +18,21 @@ namespace AutoTrack.Forms
         private Button btnSearch, btnAdd, btnRefresh;
         private ComboBox cboStatus;
         private Label lblCount;
-        private bool isAdmin = false;
+        private string currentUserRole = "";
+        private bool isAdmin = false;  // SuperAdmin or Admin
+        private bool isSupplier = false;
 
         public RestockRequestsPanel()
         {
-            string role = SessionManager.CurrentUser?.Role ?? "";
-            isAdmin = role == "SuperAdmin" || role == "Admin";
-            bool canCreate = role == "SuperAdmin" || role == "Admin" || role == "Supplier";
+            currentUserRole = SessionManager.CurrentUser?.Role ?? "";
+
+            isAdmin = currentUserRole == "SuperAdmin" || currentUserRole == "Admin";
+            isSupplier = currentUserRole == "Supplier";
 
             Init();
 
-            // Show/hide Add button based on permissions
-            btnAdd.Visible = canCreate;
+            // Only SuperAdmin and Admin can create requests
+            btnAdd.Visible = isAdmin;
 
             LoadData();
         }
@@ -48,7 +53,7 @@ namespace AutoTrack.Forms
                 Size = new Size(130, 30),
                 Font = new Font("Segoe UI", 9f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245),  // CHANGE: from White
+                BackColor = Color.FromArgb(245, 245, 245),
                 FlatStyle = FlatStyle.Flat
             };
             cboStatus.Items.AddRange(new object[] { "All", "Pending", "Approved", "Delivered", "Cancelled" });
@@ -122,45 +127,40 @@ namespace AutoTrack.Forms
             toolbar.Controls.Add(cboStatus);
             xPos += cboStatus.Width + 10;
 
-            // Separator
-            var sep1 = new Panel
+            if (isAdmin)
             {
-                Location = new Point(xPos, yPos + 2),
-                Size = new Size(1, 26),
-                BackColor = Color.FromArgb(200, 200, 200)
-            };
-            toolbar.Controls.Add(sep1);
-            xPos += sep1.Width + 10;
+                // For SuperAdmin and Admin: + Request Restock button FIRST
+                btnAdd.Location = new Point(xPos, yPos);
+                btnAdd.Size = new Size(140, 30);
+                btnAdd.BackColor = Color.FromArgb(224, 123, 36);
+                btnAdd.ForeColor = Color.White;
+                btnAdd.FlatStyle = FlatStyle.Flat;
+                btnAdd.FlatAppearance.BorderSize = 0;
+                toolbar.Controls.Add(btnAdd);
+                xPos += btnAdd.Width + 10;
 
-            // Add Button
-            btnAdd.Location = new Point(xPos, yPos);
-            btnAdd.Size = new Size(140, 30);
-            btnAdd.BackColor = Color.FromArgb(224, 123, 36);
-            btnAdd.ForeColor = Color.White;
-            btnAdd.FlatStyle = FlatStyle.Flat;
-            btnAdd.FlatAppearance.BorderSize = 0;
-            toolbar.Controls.Add(btnAdd);
-            xPos += btnAdd.Width + 10;
-
-            // Separator
-            var sep2 = new Panel
+                // Then Refresh button
+                btnRefresh.Location = new Point(xPos, yPos);
+                btnRefresh.Size = new Size(80, 30);
+                btnRefresh.BackColor = Color.FromArgb(22, 163, 74);
+                btnRefresh.ForeColor = Color.White;
+                btnRefresh.FlatStyle = FlatStyle.Flat;
+                btnRefresh.FlatAppearance.BorderSize = 0;
+                toolbar.Controls.Add(btnRefresh);
+                xPos += btnRefresh.Width + 15;
+            }
+            else
             {
-                Location = new Point(xPos, yPos + 2),
-                Size = new Size(1, 26),
-                BackColor = Color.FromArgb(200, 200, 200)
-            };
-            toolbar.Controls.Add(sep2);
-            xPos += sep2.Width + 10;
-
-            // Refresh Button
-            btnRefresh.Location = new Point(xPos, yPos);
-            btnRefresh.Size = new Size(80, 30);
-            btnRefresh.BackColor = Color.FromArgb(22, 163, 74);
-            btnRefresh.ForeColor = Color.White;
-            btnRefresh.FlatStyle = FlatStyle.Flat;
-            btnRefresh.FlatAppearance.BorderSize = 0;
-            toolbar.Controls.Add(btnRefresh);
-            xPos += btnRefresh.Width + 15;
+                // For Supplier: Refresh button next to filter (no Add button)
+                btnRefresh.Location = new Point(xPos, yPos);
+                btnRefresh.Size = new Size(80, 30);
+                btnRefresh.BackColor = Color.FromArgb(22, 163, 74);
+                btnRefresh.ForeColor = Color.White;
+                btnRefresh.FlatStyle = FlatStyle.Flat;
+                btnRefresh.FlatAppearance.BorderSize = 0;
+                toolbar.Controls.Add(btnRefresh);
+                xPos += btnRefresh.Width + 15;
+            }
 
             // Count Label
             lblCount.Location = new Point(xPos, yPos + 6);
@@ -204,33 +204,39 @@ namespace AutoTrack.Forms
             try
             {
                 string statusFilter = cboStatus.SelectedItem?.ToString() == "All" ? "" : cboStatus.SelectedItem?.ToString();
-                string role = SessionManager.CurrentUser?.Role ?? "";
                 int userId = SessionManager.CurrentUser?.UserID ?? 0;
 
                 string query = @"
-                    SELECT 
-                        rr.RestockID,
-                        rr.PartID,
-                        p.PartName AS PartName,
-                        ISNULL(s.CompanyName, 'N/A') AS Supplier,
-                        u.FullName AS RequestedBy,
-                        rr.QuantityRequested AS Quantity,
-                        rr.Status,
-                        CONVERT(VARCHAR, rr.RequestDate, 107) AS RequestDate,
-                        CONVERT(VARCHAR, rr.DeliveryDate, 107) AS DeliveryDate,
-                        ISNULL(rr.Notes, '') AS Notes
-                    FROM RestockRequests rr
-                    JOIN Inventory p ON rr.PartID = p.PartID
-                    LEFT JOIN Suppliers s ON rr.SupplierID = s.SupplierID
-                    LEFT JOIN Users u ON rr.RequestedBy = u.UserID
-                    WHERE 1=1";
+            SELECT 
+                rr.RestockID,
+                rr.PartID,
+                p.PartName AS PartName,
+                ISNULL(s.CompanyName, 'N/A') AS Supplier,
+                u.FullName AS RequestedBy,
+                rr.QuantityRequested AS Quantity,
+                rr.Status,
+                CONVERT(VARCHAR, rr.RequestDate, 107) AS RequestDate,
+                CONVERT(VARCHAR, rr.DeliveryDate, 107) AS DeliveryDate,
+                ISNULL(rr.Notes, '') AS Notes
+            FROM RestockRequests rr
+            JOIN Inventory p ON rr.PartID = p.PartID
+            LEFT JOIN Suppliers s ON rr.SupplierID = s.SupplierID
+            LEFT JOIN Users u ON rr.RequestedBy = u.UserID
+            WHERE 1=1";
 
-                var paramList = new System.Collections.Generic.List<SqlParameter>();
+                var paramList = new List<SqlParameter>();
 
-                if (role == "Supplier")
+                // For Supplier role, only show requests for THEIR supplier
+                if (isSupplier)
                 {
-                    query += " AND rr.RequestedBy = @UserID";
-                    paramList.Add(new SqlParameter("@UserID", userId));
+                    object supplierIdObj = DatabaseHelper.ExecuteScalar(@"
+                        SELECT SupplierID FROM Users WHERE UserID = @UserID",
+                        new[] { new SqlParameter("@UserID", userId) });
+
+                    int supplierId;
+                    bool hasSupplierId = int.TryParse(supplierIdObj?.ToString(), out supplierId) && supplierId > 0;
+                    query += " AND rr.SupplierID = @SupplierID";
+                    paramList.Add(new SqlParameter("@SupplierID", hasSupplierId ? supplierId : -1));
                 }
 
                 if (!string.IsNullOrEmpty(statusFilter))
@@ -251,10 +257,8 @@ namespace AutoTrack.Forms
                 BindGrid(dt);
                 lblCount.Text = $"{dgv.RowCount} request(s) found";
 
-                if (isAdmin)
-                {
-                    AddActionButtons();
-                }
+                // Add Action buttons
+                AddActionButtons();
             }
             catch (Exception ex)
             {
@@ -269,11 +273,14 @@ namespace AutoTrack.Forms
                 dgv.Columns.Remove("Actions");
             }
 
+            // Different button text based on role
+            string buttonText = isAdmin ? "Approve" : "Deliver";
+
             DataGridViewButtonColumn actionCol = new DataGridViewButtonColumn
             {
                 Name = "Actions",
                 HeaderText = "Action",
-                Text = "Approve",
+                Text = buttonText,
                 UseColumnTextForButtonValue = true,
                 Width = 80
             };
@@ -301,104 +308,129 @@ namespace AutoTrack.Forms
                 int restockId = Convert.ToInt32(row.Cells["RestockID"].Value);
                 string currentStatus = row.Cells["Status"].Value.ToString();
 
-                // PENDING -> APPROVED
-                if (currentStatus == "Pending")
+                // SUPERADMIN/ADMIN: Approve requests
+                if (isAdmin)
                 {
-                    var result = MessageBox.Show("Approve this restock request?\n\nThis will mark the request as approved.\n\nWhen goods arrive, click 'Deliver' to update inventory.",
-                        "Approve Request", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-                    if (result == DialogResult.Yes)
+                    if (currentStatus == "Pending")
                     {
-                        // Check if already approved (prevent duplicate)
-                        DataTable checkDt = DatabaseHelper.ExecuteQuery(
-                            "SELECT Status FROM RestockRequests WHERE RestockID = @ID",
-                            new[] { new SqlParameter("@ID", restockId) });
+                        var result = MessageBox.Show("Approve this restock request?\n\nThis will mark the request as approved.\n\nThe supplier can then confirm delivery when goods arrive.",
+                            "Approve Request", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
-                        if (checkDt.Rows.Count > 0 && checkDt.Rows[0]["Status"].ToString() == "Pending")
+                        if (result == DialogResult.Yes)
                         {
-                            string updateQuery = "UPDATE RestockRequests SET Status = 'Approved', UpdatedAt = GETDATE() WHERE RestockID = @ID";
-                            DatabaseHelper.ExecuteNonQuery(updateQuery, new[] { new SqlParameter("@ID", restockId) });
+                            DataTable checkDt = DatabaseHelper.ExecuteQuery(
+                                "SELECT Status FROM RestockRequests WHERE RestockID = @ID",
+                                new[] { new SqlParameter("@ID", restockId) });
 
-                            LoadData();
-                            MessageBox.Show("Request approved! Click 'Deliver' when goods arrive to update inventory.",
-                                "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
-                        else
-                        {
-                            MessageBox.Show("This request has already been processed.", "Warning",
-                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            if (checkDt.Rows.Count > 0 && checkDt.Rows[0]["Status"].ToString() == "Pending")
+                            {
+                                string updateQuery = "UPDATE RestockRequests SET Status = 'Approved', UpdatedAt = GETDATE() WHERE RestockID = @ID";
+                                DatabaseHelper.ExecuteNonQuery(updateQuery, new[] { new SqlParameter("@ID", restockId) });
+
+                                LoadData();
+                                MessageBox.Show("✓ Request approved!\n\nThe supplier can now confirm delivery when goods arrive.",
+                                    "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
+                            else
+                            {
+                                MessageBox.Show("This request has already been processed.", "Warning",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            }
                         }
                     }
-                }
-                // APPROVED -> DELIVERED (add to inventory)
-                else if (currentStatus == "Approved")
-                {
-                    var result = MessageBox.Show("Mark this request as delivered?\n\nThis will add the quantity to inventory and mark as delivered.\n\nThis action cannot be undone.",
-                        "Mark Delivered", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-                    if (result == DialogResult.Yes)
+                    else if (currentStatus == "Approved")
                     {
-                        if (row.Cells["PartID"].Value == null || row.Cells["Quantity"].Value == null)
+                        MessageBox.Show("This request has been approved.\n\nWaiting for supplier to confirm delivery.",
+                            "Approved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else if (currentStatus == "Delivered")
+                    {
+                        MessageBox.Show("This request has already been delivered.\n\nInventory has been updated.",
+                            "Delivered", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else if (currentStatus == "Cancelled")
+                    {
+                        MessageBox.Show("This request has been cancelled.",
+                            "Cancelled", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
+
+                // SUPPLIER: Confirm delivery
+                else if (isSupplier)
+                {
+                    if (currentStatus == "Approved")
+                    {
+                        var result = MessageBox.Show("Confirm delivery of this restock request?\n\nThis will add the quantity to inventory and mark as delivered.\n\nThis action cannot be undone.",
+                            "Confirm Delivery", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                        if (result == DialogResult.Yes)
                         {
-                            MessageBox.Show("Missing part information.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            return;
-                        }
-
-                        int partId = Convert.ToInt32(row.Cells["PartID"].Value);
-                        int quantity = Convert.ToInt32(row.Cells["Quantity"].Value);
-
-                        // Check if already delivered (prevent duplicate)
-                        DataTable checkDt = DatabaseHelper.ExecuteQuery(
-                            "SELECT Status FROM RestockRequests WHERE RestockID = @ID",
-                            new[] { new SqlParameter("@ID", restockId) });
-
-                        if (checkDt.Rows.Count > 0 && checkDt.Rows[0]["Status"].ToString() == "Approved")
-                        {
-                            // First, check current inventory quantity
-                            DataTable inventoryDt = DatabaseHelper.ExecuteQuery(
-                                "SELECT Quantity FROM Inventory WHERE PartID = @PID",
-                                new[] { new SqlParameter("@PID", partId) });
-
-                            int oldQuantity = 0;
-                            if (inventoryDt.Rows.Count > 0)
+                            if (row.Cells["PartID"].Value == null || row.Cells["Quantity"].Value == null)
                             {
-                                oldQuantity = Convert.ToInt32(inventoryDt.Rows[0]["Quantity"]);
+                                MessageBox.Show("Missing part information.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                return;
                             }
 
-                            // Update inventory quantity
-                            string inventoryQuery = "UPDATE Inventory SET Quantity = Quantity + @Qty, UpdatedAt = GETDATE() WHERE PartID = @PID";
-                            DatabaseHelper.ExecuteNonQuery(inventoryQuery, new[]
+                            int partId = Convert.ToInt32(row.Cells["PartID"].Value);
+                            int quantity = Convert.ToInt32(row.Cells["Quantity"].Value);
+
+                            DataTable checkDt = DatabaseHelper.ExecuteQuery(
+                                "SELECT Status FROM RestockRequests WHERE RestockID = @ID",
+                                new[] { new SqlParameter("@ID", restockId) });
+
+                            if (checkDt.Rows.Count > 0 && checkDt.Rows[0]["Status"].ToString() == "Approved")
                             {
-                        new SqlParameter("@Qty", quantity),
-                        new SqlParameter("@PID", partId)
-                    });
+                                // Get current inventory quantity
+                                DataTable inventoryDt = DatabaseHelper.ExecuteQuery(
+                                    "SELECT Quantity FROM Inventory WHERE PartID = @PID",
+                                    new[] { new SqlParameter("@PID", partId) });
 
-                            // Update restock request status to Delivered
-                            string updateQuery = "UPDATE RestockRequests SET Status = 'Delivered', DeliveryDate = GETDATE(), UpdatedAt = GETDATE() WHERE RestockID = @ID";
-                            DatabaseHelper.ExecuteNonQuery(updateQuery, new[] { new SqlParameter("@ID", restockId) });
+                                int oldQuantity = 0;
+                                if (inventoryDt.Rows.Count > 0)
+                                {
+                                    oldQuantity = Convert.ToInt32(inventoryDt.Rows[0]["Quantity"]);
+                                }
 
-                            int newQuantity = oldQuantity + quantity;
+                                // Update inventory
+                                string inventoryQuery = "UPDATE Inventory SET Quantity = Quantity + @Qty, UpdatedAt = GETDATE() WHERE PartID = @PID";
+                                DatabaseHelper.ExecuteNonQuery(inventoryQuery, new[]
+                                {
+                                    new SqlParameter("@Qty", quantity),
+                                    new SqlParameter("@PID", partId)
+                                });
 
-                            LoadData();
-                            MessageBox.Show($"Request marked as delivered!\n\nAdded {quantity} units to inventory.\n\nStock updated from {oldQuantity} to {newQuantity}.",
-                                "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
-                        else
-                        {
-                            MessageBox.Show("This request has already been delivered or is not approved.", "Warning",
-                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                // Update request status to Delivered
+                                string updateQuery = "UPDATE RestockRequests SET Status = 'Delivered', DeliveryDate = GETDATE(), UpdatedAt = GETDATE() WHERE RestockID = @ID";
+                                DatabaseHelper.ExecuteNonQuery(updateQuery, new[] { new SqlParameter("@ID", restockId) });
+
+                                int newQuantity = oldQuantity + quantity;
+
+                                LoadData();
+                                MessageBox.Show($"✓ Delivery confirmed!\n\nAdded {quantity} units to inventory.\n\nStock updated from {oldQuantity} to {newQuantity}.",
+                                    "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
+                            else
+                            {
+                                MessageBox.Show("This request has already been delivered or is not approved.", "Warning",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            }
                         }
                     }
-                }
-                else if (currentStatus == "Delivered")
-                {
-                    MessageBox.Show("This request has already been delivered.\n\nInventory has already been updated.",
-                        "Already Processed", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                else if (currentStatus == "Cancelled")
-                {
-                    MessageBox.Show("This request has been cancelled and cannot be modified.",
-                        "Cancelled", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    else if (currentStatus == "Pending")
+                    {
+                        MessageBox.Show("This request is pending approval from Admin.\n\nYou can only confirm delivery after it has been approved.",
+                            "Pending Approval", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else if (currentStatus == "Delivered")
+                    {
+                        MessageBox.Show("This request has already been delivered.\n\nInventory has already been updated.",
+                            "Already Delivered", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else if (currentStatus == "Cancelled")
+                    {
+                        MessageBox.Show("This request has been cancelled and cannot be modified.",
+                            "Cancelled", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
                 }
             }
             catch (Exception ex)
@@ -416,30 +448,29 @@ namespace AutoTrack.Forms
         }
     }
 
-    // COMPLETELY FIXED Restock Request Form
-    // COMPLETELY FIXED Restock Request Form with better supplier loading
+    // RestockRequestForm - Only accessible to SuperAdmin/Admin
     public class RestockRequestForm : Form
     {
         private ComboBox cboPart, cboSupplier;
         private NumericUpDown nudQuantity;
         private TextBox txtNotes;
         private Button btnSave, btnCancel;
-        private DataTable partsTable;
 
         public RestockRequestForm()
         {
             Init();
             LoadParts();
+            LoadSuppliers();
         }
 
         private void Init()
         {
             Text = "Request Restock";
-            Size = new Size(480, 480);
+            Size = new Size(500, 480);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
-            BackColor = Color.FromArgb(245, 245, 245);  // CHANGE: from White
+            BackColor = Color.FromArgb(245, 245, 245);
             Font = new Font("Segoe UI", 9f);
 
             var lblTitle = new Label
@@ -455,23 +486,26 @@ namespace AutoTrack.Forms
             cboPart = new ComboBox
             {
                 Location = new Point(20, 82),
-                Size = new Size(420, 30),
+                Size = new Size(440, 30),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10f),
-                BackColor = Color.FromArgb(245, 245, 245),  // Match background
-                FlatStyle = FlatStyle.Flat
+                BackColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                DropDownHeight = 200,
+                MaxDropDownItems = 10
             };
-            cboPart.SelectedIndexChanged += CboPart_SelectedIndexChanged;
 
-            var lblSupplier = new Label { Text = "Supplier:", Location = new Point(20, 124), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            var lblSupplier = new Label { Text = "Select Supplier:", Location = new Point(20, 124), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             cboSupplier = new ComboBox
             {
                 Location = new Point(20, 146),
-                Size = new Size(420, 30),
+                Size = new Size(440, 30),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10f),
-                BackColor = Color.FromArgb(245, 245, 245),  // Match background
-                FlatStyle = FlatStyle.Flat
+                BackColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                DropDownHeight = 150,
+                MaxDropDownItems = 5
             };
 
             var lblQuantity = new Label { Text = "Quantity:", Location = new Point(20, 188), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
@@ -481,17 +515,17 @@ namespace AutoTrack.Forms
             txtNotes = new TextBox
             {
                 Location = new Point(20, 274),
-                Size = new Size(420, 60),
+                Size = new Size(440, 80),
                 Multiline = true,
                 Font = new Font("Segoe UI", 10f),
                 BorderStyle = BorderStyle.FixedSingle,
-                BackColor = Color.FromArgb(245, 245, 245)  // Match background
+                BackColor = Color.White
             };
 
             btnSave = new Button
             {
                 Text = "Submit Request",
-                Location = new Point(20, 360),
+                Location = new Point(20, 380),
                 Size = new Size(140, 38),
                 BackColor = Color.FromArgb(224, 123, 36),
                 ForeColor = Color.White,
@@ -505,7 +539,7 @@ namespace AutoTrack.Forms
             btnCancel = new Button
             {
                 Text = "Cancel",
-                Location = new Point(170, 360),
+                Location = new Point(170, 380),
                 Size = new Size(100, 38),
                 BackColor = Color.FromArgb(220, 220, 220),
                 ForeColor = Color.FromArgb(60, 60, 60),
@@ -527,191 +561,180 @@ namespace AutoTrack.Forms
         {
             try
             {
-                // Load parts that need restocking with their supplier info
                 string query = @"
-                SELECT DISTINCT 
-                    p.PartID, 
-                    p.PartName,
-                    s.SupplierID,
-                    s.CompanyName
-                FROM Inventory p
-                LEFT JOIN Suppliers s ON p.SupplierID = s.SupplierID
-                WHERE (p.Quantity <= p.ReorderLevel OR p.Quantity = 0)
-                ORDER BY p.PartName";
+            SELECT 
+                p.PartID, 
+                p.PartName,
+                p.Quantity,
+                p.ReorderLevel,
+                p.Category,
+                ISNULL(p.SupplierID, 0) AS DefaultSupplierID,
+                ISNULL(s.CompanyName, 'No Supplier') AS DefaultSupplierName
+            FROM Inventory p
+            LEFT JOIN Suppliers s ON p.SupplierID = s.SupplierID
+            WHERE (p.IsArchived = 0 OR p.IsArchived IS NULL)
+            ORDER BY 
+                CASE WHEN p.Quantity <= p.ReorderLevel THEN 0 ELSE 1 END,
+                p.PartName";
 
-                partsTable = DatabaseHelper.ExecuteQuery(query);
+                DataTable partsTable = DatabaseHelper.ExecuteQuery(query);
 
-                // Display part name with supplier info
+                if (partsTable.Rows.Count == 0)
+                {
+                    MessageBox.Show("No parts found in inventory.", "Info",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    btnSave.Enabled = false;
+                    return;
+                }
+
                 DataTable displayTable = new DataTable();
                 displayTable.Columns.Add("PartID", typeof(int));
+                displayTable.Columns.Add("PartName", typeof(string));
+                displayTable.Columns.Add("DefaultSupplierID", typeof(int));
+                displayTable.Columns.Add("DefaultSupplierName", typeof(string));
                 displayTable.Columns.Add("DisplayName", typeof(string));
 
                 foreach (DataRow row in partsTable.Rows)
                 {
                     int partId = Convert.ToInt32(row["PartID"]);
                     string partName = row["PartName"].ToString();
-                    string supplierName = row["CompanyName"] != DBNull.Value ? row["CompanyName"].ToString() : "No Supplier";
+                    int quantity = Convert.ToInt32(row["Quantity"]);
+                    int reorderLevel = Convert.ToInt32(row["ReorderLevel"]);
+                    int defaultSupplierId = row["DefaultSupplierID"] != DBNull.Value ? Convert.ToInt32(row["DefaultSupplierID"]) : 0;
+                    string defaultSupplierName = row["DefaultSupplierName"].ToString();
+                    string category = row["Category"].ToString();
 
-                    displayTable.Rows.Add(partId, $"{partName} (Supplier: {supplierName})");
+                    bool isLowStock = quantity <= reorderLevel;
+                    string stockStatus = isLowStock ? "⚠️ LOW STOCK" : $"Stock: {quantity}";
+
+                    string displayName = $"{partName} [{category}] - {stockStatus}";
+
+                    displayTable.Rows.Add(partId, partName, defaultSupplierId, defaultSupplierName, displayName);
                 }
 
                 cboPart.DataSource = displayTable;
                 cboPart.DisplayMember = "DisplayName";
                 cboPart.ValueMember = "PartID";
+                cboPart.Tag = displayTable;
 
-                if (displayTable.Rows.Count == 0)
-                {
-                    MessageBox.Show("No parts need restocking at this time.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    btnSave.Enabled = false;
-                }
-                else
-                {
-                    btnSave.Enabled = true;
-                    if (cboPart.Items.Count > 0)
-                        cboPart.SelectedIndex = 0;
-                }
+                btnSave.Enabled = true;
+                if (cboPart.Items.Count > 0)
+                    cboPart.SelectedIndex = 0;
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error loading parts: " + ex.Message);
+                btnSave.Enabled = false;
             }
         }
 
-        private void CboPart_SelectedIndexChanged(object sender, EventArgs e)
+        private void LoadSuppliers()
         {
-            cboSupplier.DataSource = null;
-            cboSupplier.Items.Clear();
-
-            if (cboPart.SelectedIndex < 0 || cboPart.SelectedItem == null)
-                return;
-
             try
             {
-                int partId = 0;
+                string query = @"
+            SELECT 
+                SupplierID,
+                CompanyName,
+                ISNULL(ContactPerson, '') AS ContactPerson,
+                ISNULL(Phone, '') AS Phone,
+                ISNULL(Email, '') AS Email
+            FROM Suppliers
+            ORDER BY CompanyName";
 
-                // Get the PartID from the selected item
-                DataRowView selectedItem = cboPart.SelectedItem as DataRowView;
-                if (selectedItem != null)
+                DataTable suppliersTable = DatabaseHelper.ExecuteQuery(query);
+
+                if (suppliersTable.Rows.Count == 0)
                 {
-                    partId = Convert.ToInt32(selectedItem["PartID"]);
+                    MessageBox.Show("No suppliers found.", "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    btnSave.Enabled = false;
+                    return;
                 }
-                else if (cboPart.SelectedValue != null)
-                {
-                    partId = Convert.ToInt32(cboPart.SelectedValue);
-                }
 
-                if (partId > 0)
-                {
-                    // Get the supplier from the partsTable
-                    DataRow[] rows = partsTable.Select($"PartID = {partId}");
+                cboSupplier.DataSource = suppliersTable;
+                cboSupplier.DisplayMember = "CompanyName";
+                cboSupplier.ValueMember = "SupplierID";
+                cboSupplier.DropDownStyle = ComboBoxStyle.DropDownList;
+                cboSupplier.SelectedIndex = 0;
 
-                    if (rows.Length > 0)
-                    {
-                        int supplierId = rows[0]["SupplierID"] != DBNull.Value ? Convert.ToInt32(rows[0]["SupplierID"]) : 0;
-                        string supplierName = rows[0]["CompanyName"] != DBNull.Value ? rows[0]["CompanyName"].ToString() : "";
-
-                        if (supplierId > 0 && !string.IsNullOrEmpty(supplierName))
-                        {
-                            // Create a single supplier entry
-                            DataTable supplierTable = new DataTable();
-                            supplierTable.Columns.Add("SupplierID", typeof(int));
-                            supplierTable.Columns.Add("CompanyName", typeof(string));
-                            supplierTable.Rows.Add(supplierId, supplierName);
-
-                            cboSupplier.DataSource = supplierTable;
-                            cboSupplier.DisplayMember = "CompanyName";
-                            cboSupplier.ValueMember = "SupplierID";
-                            cboSupplier.SelectedIndex = 0;
-                        }
-                        else
-                        {
-                            cboSupplier.Text = "No supplier assigned to this part";
-                            cboSupplier.Enabled = false;
-                        }
-                    }
-                    else
-                    {
-                        cboSupplier.Text = "No supplier found";
-                        cboSupplier.Enabled = false;
-                    }
-                }
+                Debug.WriteLine($"Loaded {suppliersTable.Rows.Count} suppliers");
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error loading supplier: " + ex.Message);
-                cboSupplier.Text = "Error loading supplier";
+                MessageBox.Show("Error loading suppliers: " + ex.Message, "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void Save(object sender, EventArgs e)
         {
-            // Validate part selection
             if (cboPart.SelectedIndex < 0 || cboPart.SelectedItem == null)
             {
                 MessageBox.Show("Please select a part.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
+            if (cboSupplier.SelectedIndex < 0 || cboSupplier.SelectedItem == null)
+            {
+                MessageBox.Show("Please select a supplier.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             int userId = SessionManager.CurrentUser?.UserID ?? 1;
 
-            // Get the PartID
             int partId = 0;
             DataRowView selectedPart = cboPart.SelectedItem as DataRowView;
             if (selectedPart != null)
             {
                 partId = Convert.ToInt32(selectedPart["PartID"]);
             }
-            else if (cboPart.SelectedValue != null)
+
+            int supplierId = 0;
+            DataRowView selectedSupplier = cboSupplier.SelectedItem as DataRowView;
+            if (selectedSupplier != null)
             {
-                partId = Convert.ToInt32(cboPart.SelectedValue);
+                supplierId = Convert.ToInt32(selectedSupplier["SupplierID"]);
             }
 
-            // ========== DUPLICATE CHECK ==========
-            // Check if there's already a Pending or Approved request for this part
+            // Check for existing pending/approved request
             DataTable checkDt = DatabaseHelper.ExecuteQuery(
                 @"SELECT RestockID, Status FROM RestockRequests 
-          WHERE PartID = @PID AND Status IN ('Pending', 'Approved')",
+              WHERE PartID = @PID AND Status IN ('Pending', 'Approved')",
                 new[] { new SqlParameter("@PID", partId) });
 
             if (checkDt.Rows.Count > 0)
             {
                 string existingStatus = checkDt.Rows[0]["Status"].ToString();
-                MessageBox.Show($"Cannot create new restock request.\n\nA {existingStatus} request for this part already exists.\n\nPlease wait for the current request to be completed before creating a new one.",
+                MessageBox.Show($"Cannot create new restock request.\n\nA {existingStatus} request for this part already exists.\n\nPlease wait for the current request to be completed.",
                     "Duplicate Request", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
-            }
-            // =====================================
-
-            // Get SupplierID
-            object supplierId = DBNull.Value;
-            if (cboSupplier.SelectedIndex >= 0 && cboSupplier.SelectedItem != null)
-            {
-                DataRowView selectedSupplier = cboSupplier.SelectedItem as DataRowView;
-                if (selectedSupplier != null && selectedSupplier["SupplierID"] != DBNull.Value)
-                {
-                    supplierId = Convert.ToInt32(selectedSupplier["SupplierID"]);
-                }
-                else if (cboSupplier.SelectedValue != null && cboSupplier.SelectedValue != DBNull.Value)
-                {
-                    supplierId = Convert.ToInt32(cboSupplier.SelectedValue);
-                }
             }
 
             try
             {
                 DatabaseHelper.ExecuteNonQuery(
                     @"INSERT INTO RestockRequests (PartID, SupplierID, RequestedBy, QuantityRequested, Status, RequestDate, Notes)
-              VALUES (@PID, @SID, @By, @Qty, 'Pending', GETDATE(), @Notes)",
+                  VALUES (@PID, @SID, @By, @Qty, 'Pending', GETDATE(), @Notes)",
                     new SqlParameter[]
                     {
-                new SqlParameter("@PID", partId),
-                new SqlParameter("@SID", supplierId),
-                new SqlParameter("@By", userId),
-                new SqlParameter("@Qty", nudQuantity.Value),
-                new SqlParameter("@Notes", txtNotes.Text.Trim())
+                        new SqlParameter("@PID", partId),
+                        new SqlParameter("@SID", supplierId),
+                        new SqlParameter("@By", userId),
+                        new SqlParameter("@Qty", nudQuantity.Value),
+                        new SqlParameter("@Notes", txtNotes.Text.Trim())
                     });
 
-                MessageBox.Show("Restock request submitted successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string supplierName = selectedSupplier["CompanyName"].ToString();
+                string partName = selectedPart["PartName"].ToString();
+
+                MessageBox.Show($"✓ Restock request submitted successfully!\n\n" +
+                    $"Part: {partName}\n" +
+                    $"Supplier: {supplierName}\n" +
+                    $"Quantity: {nudQuantity.Value}\n\n" +
+                    $"Status: Pending",
+                    "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
                 DialogResult = DialogResult.OK;
             }
             catch (Exception ex)
@@ -719,7 +742,5 @@ namespace AutoTrack.Forms
                 MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
     }
-
 }

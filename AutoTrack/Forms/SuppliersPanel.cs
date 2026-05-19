@@ -55,27 +55,35 @@ namespace AutoTrack.Forms
         {
             try
             {
-                string q = @"SELECT SupplierID, CompanyName AS [Company], ContactPerson AS [Contact],
-                    Phone, Email, PartsSupplied AS [Parts Supplied],
-                    CONVERT(VARCHAR,CreatedAt,107) AS [Added] FROM Suppliers";
+                // Modified query: Only show suppliers that exist in Users table with role = 'Supplier'
+                string q = @"SELECT DISTINCT 
+                    s.SupplierID, 
+                    s.CompanyName AS [Company], 
+                    s.ContactPerson AS [Contact],
+                    s.Phone, 
+                    s.Email, 
+                    s.PartsSupplied AS [Parts Supplied],
+                    CONVERT(VARCHAR, s.CreatedAt, 107) AS [Added] 
+                    FROM Suppliers s
+                    INNER JOIN Users u ON (s.ContactPerson = u.FullName OR s.SupplierID = u.SupplierID)
+                    WHERE u.Role = 'Supplier' AND u.IsActive = 1";
 
                 var paramList = new System.Collections.Generic.List<SqlParameter>();
 
-                // Supplier mode: only see their info
+                // Supplier mode: only see their own info
                 if (_supplierMode && _userId > 0)
                 {
-                    q += " WHERE ContactPerson = (SELECT FullName FROM Users WHERE UserID = @UserID)";
+                    q += " AND u.UserID = @UserID";
                     paramList.Add(new SqlParameter("@UserID", _userId));
                 }
 
                 // Search box filter
                 if (!string.IsNullOrEmpty(search))
                 {
-                    q += (q.Contains("WHERE") ? " AND" : " WHERE") +
-                         " (CompanyName LIKE @S OR ContactPerson LIKE @S OR PartsSupplied LIKE @S)";
+                    q += " AND (s.CompanyName LIKE @S OR s.ContactPerson LIKE @S OR s.PartsSupplied LIKE @S)";
                     paramList.Add(new SqlParameter("@S", "%" + search + "%"));
                 }
-                q += " ORDER BY CompanyName";
+                q += " ORDER BY s.CompanyName";
 
                 DataTable dt = DatabaseHelper.ExecuteQuery(q, paramList.ToArray());
 
@@ -167,14 +175,34 @@ namespace AutoTrack.Forms
                 MessageBox.Show("Select a supplier to delete.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
+
             string name = dgv.SelectedRows[0].Cells["Company"].Value?.ToString();
-            if (MessageBox.Show($"Delete '{name}'?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+
+            if (MessageBox.Show($"Delete '{name}'?\n\nThis will also remove the associated user account.", "Confirm",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
             {
                 try
                 {
                     int id = Convert.ToInt32(dgv.SelectedRows[0].Cells["SupplierID"].Value);
+
+                    // First, get the user associated with this supplier
+                    DataTable userDt = DatabaseHelper.ExecuteQuery(
+                        "SELECT UserID FROM Users WHERE SupplierID = @SupplierID OR FullName = (SELECT ContactPerson FROM Suppliers WHERE SupplierID = @SupplierID)",
+                        new[] { new SqlParameter("@SupplierID", id) });
+
+                    // Delete the supplier
                     DatabaseHelper.ExecuteNonQuery("DELETE FROM Suppliers WHERE SupplierID=@ID", new[] { new SqlParameter("@ID", id) });
+
+                    // Delete the associated user if exists
+                    if (userDt.Rows.Count > 0)
+                    {
+                        int userId = Convert.ToInt32(userDt.Rows[0]["UserID"]);
+                        DatabaseHelper.ExecuteNonQuery("DELETE FROM Users WHERE UserID = @UserID", new[] { new SqlParameter("@UserID", userId) });
+                    }
+
                     LoadData();
+                    MessageBox.Show("Supplier and associated user deleted successfully!", "Success",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 catch (Exception ex)
                 {
