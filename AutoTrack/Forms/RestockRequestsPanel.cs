@@ -226,6 +226,7 @@ namespace AutoTrack.Forms
 
                 var paramList = new List<SqlParameter>();
 
+<<<<<<< HEAD
                 // For Supplier role, only show requests for THEIR supplier
                 if (isSupplier)
                 {
@@ -237,6 +238,13 @@ namespace AutoTrack.Forms
                     bool hasSupplierId = int.TryParse(supplierIdObj?.ToString(), out supplierId) && supplierId > 0;
                     query += " AND rr.SupplierID = @SupplierID";
                     paramList.Add(new SqlParameter("@SupplierID", hasSupplierId ? supplierId : -1));
+=======
+                // If Supplier role, only show requests for THEIR supplier
+                if (role == "Supplier")
+                {
+                    query += " AND rr.SupplierID = (SELECT SupplierID FROM Users WHERE UserID = @UserID)";
+                    paramList.Add(new SqlParameter("@UserID", userId));
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
                 }
 
                 if (!string.IsNullOrEmpty(statusFilter))
@@ -447,26 +455,43 @@ namespace AutoTrack.Forms
                 LoadData();
         }
     }
+<<<<<<< HEAD
 
     // RestockRequestForm - Only accessible to SuperAdmin/Admin
+=======
+    // COMPLETE FIXED RestockRequestForm with proper supplier dropdown
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
     public class RestockRequestForm : Form
     {
         private ComboBox cboPart, cboSupplier;
         private NumericUpDown nudQuantity;
         private TextBox txtNotes;
         private Button btnSave, btnCancel;
+<<<<<<< HEAD
+=======
+        private DataTable partsTable;
+        private DataTable suppliersTable;
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
 
         public RestockRequestForm()
         {
             Init();
             LoadParts();
+<<<<<<< HEAD
             LoadSuppliers();
+=======
+            LoadAllSuppliers();
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
         }
 
         private void Init()
         {
             Text = "Request Restock";
+<<<<<<< HEAD
             Size = new Size(500, 480);
+=======
+            Size = new Size(500, 520);
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -490,9 +515,13 @@ namespace AutoTrack.Forms
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10f),
                 BackColor = Color.White,
+<<<<<<< HEAD
                 FlatStyle = FlatStyle.Flat,
                 DropDownHeight = 200,
                 MaxDropDownItems = 10
+=======
+                FlatStyle = FlatStyle.Flat
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
             };
 
             var lblSupplier = new Label { Text = "Select Supplier:", Location = new Point(20, 124), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
@@ -503,9 +532,13 @@ namespace AutoTrack.Forms
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10f),
                 BackColor = Color.White,
+<<<<<<< HEAD
                 FlatStyle = FlatStyle.Flat,
                 DropDownHeight = 150,
                 MaxDropDownItems = 5
+=======
+                FlatStyle = FlatStyle.Flat
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
             };
 
             var lblQuantity = new Label { Text = "Quantity:", Location = new Point(20, 188), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
@@ -551,16 +584,22 @@ namespace AutoTrack.Forms
             btnCancel.Click += (s, e) => DialogResult = DialogResult.Cancel;
 
             Controls.AddRange(new Control[] {
-                lblTitle, lblPart, cboPart, lblSupplier, cboSupplier,
-                lblQuantity, nudQuantity, lblNotes, txtNotes,
-                btnSave, btnCancel
-            });
+            lblTitle, lblPart, cboPart, lblSupplier, cboSupplier,
+            lblQuantity, nudQuantity, lblNotes, txtNotes,
+            btnSave, btnCancel
+        });
         }
 
         private void LoadParts()
         {
             try
             {
+<<<<<<< HEAD
+=======
+                string role = SessionManager.CurrentUser?.Role ?? "";
+                int userId = SessionManager.CurrentUser?.UserID ?? 0;
+
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
                 string query = @"
             SELECT 
                 p.PartID, 
@@ -572,6 +611,7 @@ namespace AutoTrack.Forms
                 ISNULL(s.CompanyName, 'No Supplier') AS DefaultSupplierName
             FROM Inventory p
             LEFT JOIN Suppliers s ON p.SupplierID = s.SupplierID
+<<<<<<< HEAD
             WHERE (p.IsArchived = 0 OR p.IsArchived IS NULL)
             ORDER BY 
                 CASE WHEN p.Quantity <= p.ReorderLevel THEN 0 ELSE 1 END,
@@ -587,6 +627,44 @@ namespace AutoTrack.Forms
                     return;
                 }
 
+=======
+            WHERE (p.IsArchived = 0 OR p.IsArchived IS NULL)";
+
+                SqlParameter[] parameters = null;
+
+                // If Supplier role, only show parts that belong to THEIR supplier
+                if (role == "Supplier")
+                {
+                    query += @" AND p.SupplierID = (
+                SELECT SupplierID FROM Users WHERE UserID = @UserID
+            )";
+                    parameters = new SqlParameter[] { new SqlParameter("@UserID", userId) };
+                }
+
+                query += @" ORDER BY 
+            CASE WHEN p.Quantity <= p.ReorderLevel THEN 0 ELSE 1 END,
+            p.PartName";
+
+                DataTable partsTable = DatabaseHelper.ExecuteQuery(query, parameters);
+
+                if (partsTable.Rows.Count == 0)
+                {
+                    if (role == "Supplier")
+                    {
+                        MessageBox.Show("No parts found for your supplier account.\n\nPlease contact administrator to assign parts to your supplier.",
+                            "No Parts Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    else
+                    {
+                        MessageBox.Show("No parts found in inventory.", "Info",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    btnSave.Enabled = false;
+                    return;
+                }
+
+                // Create display table with formatted names
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
                 DataTable displayTable = new DataTable();
                 displayTable.Columns.Add("PartID", typeof(int));
                 displayTable.Columns.Add("PartName", typeof(string));
@@ -627,6 +705,7 @@ namespace AutoTrack.Forms
                 btnSave.Enabled = false;
             }
         }
+<<<<<<< HEAD
 
         private void LoadSuppliers()
         {
@@ -652,13 +731,86 @@ namespace AutoTrack.Forms
                     return;
                 }
 
+=======
+        private void LoadAllSuppliers()
+        {
+            try
+            {
+                string role = SessionManager.CurrentUser?.Role ?? "";
+                int userId = SessionManager.CurrentUser?.UserID ?? 0;
+
+                string query = "";
+                SqlParameter[] parameters = null;
+
+                // If user is Supplier, only show THEIR supplier
+                if (role == "Supplier")
+                {
+                    query = @"
+                SELECT 
+                    s.SupplierID,
+                    s.CompanyName,
+                    ISNULL(s.ContactPerson, '') AS ContactPerson,
+                    ISNULL(s.Phone, '') AS Phone,
+                    ISNULL(s.Email, '') AS Email
+                FROM Suppliers s
+                INNER JOIN Users u ON u.SupplierID = s.SupplierID
+                WHERE u.UserID = @UserID";
+
+                    parameters = new SqlParameter[] { new SqlParameter("@UserID", userId) };
+                }
+                else // Admin, Staff, SuperAdmin can see all suppliers
+                {
+                    query = @"
+                SELECT 
+                    SupplierID,
+                    CompanyName,
+                    ISNULL(ContactPerson, '') AS ContactPerson,
+                    ISNULL(Phone, '') AS Phone,
+                    ISNULL(Email, '') AS Email
+                FROM Suppliers
+                WHERE SupplierID IN (45, 46, 7)  -- Your three main suppliers
+                ORDER BY CompanyName";
+
+                    parameters = null;
+                }
+
+                DataTable suppliersTable = DatabaseHelper.ExecuteQuery(query, parameters);
+
+                if (suppliersTable.Rows.Count == 0)
+                {
+                    MessageBox.Show("No suppliers found for your account.", "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    btnSave.Enabled = false;
+                    return;
+                }
+
+                // Bind to dropdown
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
                 cboSupplier.DataSource = suppliersTable;
                 cboSupplier.DisplayMember = "CompanyName";
                 cboSupplier.ValueMember = "SupplierID";
                 cboSupplier.DropDownStyle = ComboBoxStyle.DropDownList;
+<<<<<<< HEAD
                 cboSupplier.SelectedIndex = 0;
 
                 Debug.WriteLine($"Loaded {suppliersTable.Rows.Count} suppliers");
+=======
+
+                // For Supplier role, disable the dropdown (they only have one choice)
+                if (role == "Supplier" && suppliersTable.Rows.Count == 1)
+                {
+                    cboSupplier.Enabled = false;
+                    // Optional: Change background color to show it's disabled
+                    cboSupplier.BackColor = Color.FromArgb(240, 240, 240);
+                }
+                else
+                {
+                    cboSupplier.Enabled = true;
+                    cboSupplier.SelectedIndex = 0;
+                }
+
+                Debug.WriteLine($"Loaded {suppliersTable.Rows.Count} suppliers for role: {role}");
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
             }
             catch (Exception ex)
             {
@@ -669,6 +821,10 @@ namespace AutoTrack.Forms
 
         private void Save(object sender, EventArgs e)
         {
+<<<<<<< HEAD
+=======
+            // Validate selections
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
             if (cboPart.SelectedIndex < 0 || cboPart.SelectedItem == null)
             {
                 MessageBox.Show("Please select a part.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -683,6 +839,10 @@ namespace AutoTrack.Forms
 
             int userId = SessionManager.CurrentUser?.UserID ?? 1;
 
+<<<<<<< HEAD
+=======
+            // Get PartID
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
             int partId = 0;
             DataRowView selectedPart = cboPart.SelectedItem as DataRowView;
             if (selectedPart != null)
@@ -690,6 +850,10 @@ namespace AutoTrack.Forms
                 partId = Convert.ToInt32(selectedPart["PartID"]);
             }
 
+<<<<<<< HEAD
+=======
+            // Get SupplierID
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
             int supplierId = 0;
             DataRowView selectedSupplier = cboSupplier.SelectedItem as DataRowView;
             if (selectedSupplier != null)
@@ -718,11 +882,19 @@ namespace AutoTrack.Forms
                   VALUES (@PID, @SID, @By, @Qty, 'Pending', GETDATE(), @Notes)",
                     new SqlParameter[]
                     {
+<<<<<<< HEAD
                         new SqlParameter("@PID", partId),
                         new SqlParameter("@SID", supplierId),
                         new SqlParameter("@By", userId),
                         new SqlParameter("@Qty", nudQuantity.Value),
                         new SqlParameter("@Notes", txtNotes.Text.Trim())
+=======
+                    new SqlParameter("@PID", partId),
+                    new SqlParameter("@SID", supplierId),
+                    new SqlParameter("@By", userId),
+                    new SqlParameter("@Qty", nudQuantity.Value),
+                    new SqlParameter("@Notes", txtNotes.Text.Trim())
+>>>>>>> 84f75aaeaf79a7fdc5f8ecb8a600ec8daf819578
                     });
 
                 string supplierName = selectedSupplier["CompanyName"].ToString();
