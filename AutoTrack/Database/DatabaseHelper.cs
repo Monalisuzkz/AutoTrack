@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Data.SqlClient;
+using System.Diagnostics;
 
 namespace AutoTrack.Database
 {
@@ -28,8 +29,9 @@ namespace AutoTrack.Database
                     return conn.State == ConnectionState.Open;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Trace.TraceError("Database connection test failed: " + ex);
                 return false;
             }
         }

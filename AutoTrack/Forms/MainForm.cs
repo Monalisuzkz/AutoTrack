@@ -4,6 +4,7 @@ using AutoTrack.Helpers;
 using System;
 using System.Data;
 using System.Drawing;
+using System.Diagnostics;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -691,7 +692,10 @@ namespace AutoTrack.Forms
                         weeklyRevenue[day] = Convert.ToInt32(row["DailyRevenue"]);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Trace.TraceError("Failed to load weekly revenue chart data: " + ex);
+            }
 
             int maxRevenue = weeklyRevenue.Length > 0 ? Math.Max(1, weeklyRevenue.Max()) : 1;
             int barWidth = (panel.Width - 80) / 7 - 8;
@@ -744,7 +748,10 @@ namespace AutoTrack.Forms
                     completed = Convert.ToInt32(dt.Rows[0]["Completed"]);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Trace.TraceError("Failed to load service pie chart data: " + ex);
+            }
 
             int total = pending + inProgress + completed;
             if (total == 0) total = 1;
