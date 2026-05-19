@@ -68,7 +68,7 @@ namespace AutoTrack.Forms
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(245, 245, 245)
             };
-            cboRole.Items.AddRange(new object[] { "Admin", "Staff", "Technician", "Supplier" });
+            cboRole.Items.AddRange(new object[] {"Staff", "Technician", "Supplier" });
             cboRole.SelectedIndex = 1;
 
             chkActive = new CheckBox

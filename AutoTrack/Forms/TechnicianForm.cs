@@ -30,7 +30,7 @@ namespace AutoTrack.Forms
         private void Init()
         {
             Text = _edit ? "Edit Technician" : "Add Technician";
-            Size = new Size(450, 420);
+            Size = new Size(450, 390);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -63,7 +63,10 @@ namespace AutoTrack.Forms
                 Size = new Size(390, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 200,
+                MaxDropDownItems = 10,
+                IntegralHeight = true
             };
             cboUser.SelectedIndex = -1;  // Empty by default
 
@@ -75,7 +78,10 @@ namespace AutoTrack.Forms
                 Size = new Size(390, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 200,
+                MaxDropDownItems = 12,
+                IntegralHeight = true
             };
 
             // Add common specializations
@@ -103,7 +109,10 @@ namespace AutoTrack.Forms
                 Size = new Size(170, 28),
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(245, 245, 245)
+                BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 100,
+                MaxDropDownItems = 6,
+                IntegralHeight = true
             };
             cboLevel.Items.AddRange(new object[] { "Junior", "Senior", "Master" });
             cboLevel.SelectedIndex = -1;  // ← Empty, no default selection

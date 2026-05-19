@@ -119,7 +119,7 @@ namespace AutoTrack.Forms
         private void Init()
         {
             Text = _edit ? "Edit Vehicle" : "Register Vehicle";
-            Size = new Size(540, 580);
+            Size = new Size(510, 540);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -167,8 +167,9 @@ namespace AutoTrack.Forms
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(245, 245, 245),
-                MaxDropDownItems = 8,  // Show 8 items then scroll
-                DropDownHeight = 200
+                DropDownHeight = 100,  
+                MaxDropDownItems = 10,  
+                IntegralHeight = false
             };
             cboOwner.SelectedIndex = -1;
             yPos += rowGap;
@@ -187,8 +188,9 @@ namespace AutoTrack.Forms
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(245, 245, 245),
-                MaxDropDownItems = 8,  // Show 8 items then scroll
-                DropDownHeight = 200
+                DropDownHeight = 100,
+                MaxDropDownItems = 12,
+                IntegralHeight = false
             };
             cboMake.SelectedIndex = -1;
             yPos += rowGap;
@@ -207,8 +209,9 @@ namespace AutoTrack.Forms
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(245, 245, 245),
-                MaxDropDownItems = 8,  // Show 8 years then scroll
-                DropDownHeight = 200
+                DropDownHeight = 100,
+                MaxDropDownItems = 10,
+                IntegralHeight = false
             };
             cboYear.SelectedIndex = -1;
             yPos += rowGap;
@@ -232,8 +235,9 @@ namespace AutoTrack.Forms
                 Font = new Font("Segoe UI", 10f),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(245, 245, 245),
+                DropDownHeight = 100,
                 MaxDropDownItems = 3,
-                DropDownHeight = 100
+                IntegralHeight = true
             };
             cboTrans.Items.AddRange(new object[] { "Automatic", "Manual", "CVT" });
             cboTrans.SelectedIndex = -1;
@@ -322,20 +326,37 @@ namespace AutoTrack.Forms
         }
 
         private void LoadYears()
-    {
-        try
         {
-            int currentYear = DateTime.Now.Year;
-            for (int year = currentYear + 1; year >= 1950; year--)
+            try
             {
-                cboYear.Items.Add(year.ToString());
-            }
-            cboYear.SelectedIndex = -1;
-        }
-        catch (Exception ex) { MessageBox.Show("Error loading years: " + ex.Message); }
-    }
+                cboYear.Items.Clear();
+                int currentYear = DateTime.Now.Year;
 
-    private void LoadOwners()
+                // Add years from NEWEST to OLDEST
+                for (int year = currentYear + 1; year >= 1950; year--)
+                {
+                    cboYear.Items.Add(year.ToString());
+                }
+
+                cboYear.SelectedIndex = 0;
+
+                // Critical: Set these properties
+                cboYear.DropDownHeight = 150;
+                cboYear.MaxDropDownItems = 10;
+                cboYear.IntegralHeight = false;  // ← This prevents upward flipping
+                cboYear.DropDownWidth = cboYear.Width;
+
+                // Optional: Add tooltip
+                ToolTip tt = new ToolTip();
+                tt.SetToolTip(cboYear, "Select vehicle year");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error loading years: " + ex.Message);
+            }
+        }
+
+        private void LoadOwners()
     {
         try
         {

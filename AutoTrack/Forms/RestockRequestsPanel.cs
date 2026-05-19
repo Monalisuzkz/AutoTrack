@@ -230,12 +230,15 @@ namespace AutoTrack.Forms
                 if (isSupplier)
                 {
                     object supplierIdObj = DatabaseHelper.ExecuteScalar(@"
-                        SELECT SupplierID FROM Users WHERE UserID = @UserID",
+                        SELECT s.SupplierID
+                        FROM Suppliers s
+                        INNER JOIN Users u ON s.ContactPerson = u.FullName
+                        WHERE u.UserID = @UserID",
                         new[] { new SqlParameter("@UserID", userId) });
 
                     int supplierId;
                     bool hasSupplierId = int.TryParse(supplierIdObj?.ToString(), out supplierId) && supplierId > 0;
-                    query += " AND rr.SupplierID = @SupplierID";
+                    query += " AND p.SupplierID = @SupplierID";
                     paramList.Add(new SqlParameter("@SupplierID", hasSupplierId ? supplierId : -1));
                 }
 
@@ -743,4 +746,5 @@ namespace AutoTrack.Forms
             }
         }
     }
+
 }
