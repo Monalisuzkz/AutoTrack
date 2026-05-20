@@ -227,18 +227,18 @@ namespace AutoTrack.Forms
                 var paramList = new List<SqlParameter>();
 
                 // For Supplier role, only show requests for THEIR supplier
+                // For Supplier role, only show requests for THEIR supplier
                 if (isSupplier)
                 {
                     object supplierIdObj = DatabaseHelper.ExecuteScalar(@"
-                        SELECT s.SupplierID
-                        FROM Suppliers s
-                        INNER JOIN Users u ON s.ContactPerson = u.FullName
-                        WHERE u.UserID = @UserID",
+        SELECT SupplierID
+        FROM Users
+        WHERE UserID = @UserID",
                         new[] { new SqlParameter("@UserID", userId) });
 
                     int supplierId;
                     bool hasSupplierId = int.TryParse(supplierIdObj?.ToString(), out supplierId) && supplierId > 0;
-                    query += " AND p.SupplierID = @SupplierID";
+                    query += " AND rr.SupplierID = @SupplierID";
                     paramList.Add(new SqlParameter("@SupplierID", hasSupplierId ? supplierId : -1));
                 }
 

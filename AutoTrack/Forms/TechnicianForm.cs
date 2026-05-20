@@ -68,7 +68,7 @@ namespace AutoTrack.Forms
                 MaxDropDownItems = 10,
                 IntegralHeight = true
             };
-            cboUser.SelectedIndex = -1;  // Empty by default
+            cboUser.SelectedIndex = -1;
 
             // Specialization (Dropdown)
             lblSpec = Lbl("Specialization:", 20, 116);
@@ -84,22 +84,21 @@ namespace AutoTrack.Forms
                 IntegralHeight = true
             };
 
-            // Add common specializations
             cboSpecialization.Items.AddRange(new object[] {
-            "General Repair",
-            "Engine Specialist",
-            "Transmission Specialist",
-            "Electrical Systems",
-            "Brakes & Suspension",
-            "Air Conditioning",
-            "Diagnostics",
-            "Body & Paint",
-            "Tire & Wheel",
-            "Exhaust System",
-            "Cooling System",
-            "Fuel System"
-        });
-            cboSpecialization.SelectedIndex = -1;  // ← Empty, no default selection
+                "General Repair",
+                "Engine Specialist",
+                "Transmission Specialist",
+                "Electrical Systems",
+                "Brakes & Suspension",
+                "Air Conditioning",
+                "Diagnostics",
+                "Body & Paint",
+                "Tire & Wheel",
+                "Exhaust System",
+                "Cooling System",
+                "Fuel System"
+            });
+            cboSpecialization.SelectedIndex = -1;
 
             // Level
             lblLevel = Lbl("Level:", 20, 176);
@@ -115,7 +114,7 @@ namespace AutoTrack.Forms
                 IntegralHeight = true
             };
             cboLevel.Items.AddRange(new object[] { "Junior", "Senior", "Master" });
-            cboLevel.SelectedIndex = -1;  // ← Empty, no default selection
+            cboLevel.SelectedIndex = -1;
 
             // Available
             chkAvail = new CheckBox
@@ -157,12 +156,12 @@ namespace AutoTrack.Forms
             btnCancel.Click += (s, e) => DialogResult = DialogResult.Cancel;
 
             Controls.AddRange(new Control[] {
-            lblTitle, lblUser, cboUser,
-            lblSpec, cboSpecialization,
-            lblLevel, cboLevel,
-            chkAvail,
-            btnSave, btnCancel
-        });
+                lblTitle, lblUser, cboUser,
+                lblSpec, cboSpecialization,
+                lblLevel, cboLevel,
+                chkAvail,
+                btnSave, btnCancel
+            });
         }
 
         private void LoadSpecializations()
@@ -170,10 +169,12 @@ namespace AutoTrack.Forms
             try
             {
                 // Specializations already loaded in Init()
-                // Keep SelectedIndex = -1
                 cboSpecialization.SelectedIndex = -1;
             }
-            catch (Exception ex) { MessageBox.Show("Error loading specializations: " + ex.Message); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error loading specializations: " + ex.Message);
+            }
         }
 
         private void LoadUsers()
@@ -181,36 +182,75 @@ namespace AutoTrack.Forms
             try
             {
                 string q = _edit
-                    ? "SELECT UserID, FullName FROM Users WHERE Role='Technician' AND IsActive=1 AND (UserID NOT IN(SELECT UserID FROM Technicians) OR UserID=(SELECT UserID FROM Technicians WHERE TechnicianID=@ID)) ORDER BY FullName"
-                    : "SELECT UserID, FullName FROM Users WHERE Role='Technician' AND IsActive=1 AND UserID NOT IN(SELECT UserID FROM Technicians) ORDER BY FullName";
+                    ? @"SELECT u.UserID, u.FullName 
+                       FROM Users u 
+                       WHERE u.Role = 'Technician' 
+                       AND u.IsActive = 1 
+                       AND (u.UserID NOT IN (SELECT UserID FROM Technicians WHERE UserID IS NOT NULL) 
+                            OR u.UserID = (SELECT UserID FROM Technicians WHERE TechnicianID = @ID)) 
+                       ORDER BY u.FullName"
+                    : @"SELECT u.UserID, u.FullName 
+                       FROM Users u 
+                       WHERE u.Role = 'Technician' 
+                       AND u.IsActive = 1 
+                       AND u.UserID NOT IN (SELECT UserID FROM Technicians WHERE UserID IS NOT NULL)
+                       ORDER BY u.FullName";
 
                 SqlParameter[] p = _edit ? new[] { new SqlParameter("@ID", _id) } : null;
                 DataTable dt = DatabaseHelper.ExecuteQuery(q, p);
 
-                cboUser.DataSource = dt;
-                cboUser.DisplayMember = "FullName";
-                cboUser.ValueMember = "UserID";
-                cboUser.SelectedIndex = -1;  // ← Empty, no default selection
+                if (dt.Rows.Count == 0)
+                {
+                    // No available users - show message
+                    cboUser.DataSource = null;
+                    cboUser.Items.Clear();
+                    cboUser.DropDownStyle = ComboBoxStyle.DropDown;
+                    cboUser.Text = "No available users. Please add a user with Technician role first.";
+                    cboUser.Enabled = false;
+                    btnSave.Enabled = false;
+
+                }
+                else
+                {
+                    cboUser.DataSource = dt;
+                    cboUser.DisplayMember = "FullName";
+                    cboUser.ValueMember = "UserID";
+                    cboUser.SelectedIndex = -1;
+                    cboUser.Enabled = true;
+                    btnSave.Enabled = true;
+                }
             }
-            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error loading users: " + ex.Message);
+            }
         }
 
         private void LoadTech()
         {
             try
             {
-                DataTable dt = DatabaseHelper.ExecuteQuery("SELECT * FROM Technicians WHERE TechnicianID=@ID",
+                DataTable dt = DatabaseHelper.ExecuteQuery(
+                    "SELECT * FROM Technicians WHERE TechnicianID = @ID",
                     new[] { new SqlParameter("@ID", _id) });
+
                 if (dt.Rows.Count > 0)
                 {
                     DataRow r = dt.Rows[0];
-                    cboUser.SelectedValue = Convert.ToInt32(r["UserID"]);
+
+                    // Find the user linked to this technician
+                    int userId = Convert.ToInt32(r["UserID"]);
+                    cboUser.SelectedValue = userId;
+
                     cboSpecialization.Text = r["Specialization"].ToString();
                     cboLevel.Text = r["Level"].ToString();
                     chkAvail.Checked = Convert.ToBoolean(r["IsAvailable"]);
                 }
             }
-            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error loading technician: " + ex.Message);
+            }
         }
 
         private void Save(object sender, EventArgs e)
@@ -243,23 +283,31 @@ namespace AutoTrack.Forms
             try
             {
                 SqlParameter[] p = {
-                new SqlParameter("@UID",   cboUser.SelectedValue),
-                new SqlParameter("@Spec",  cboSpecialization.Text.Trim()),
-                new SqlParameter("@Level", cboLevel.Text),
-                new SqlParameter("@Avail", chkAvail.Checked ? 1 : 0)
-            };
+                    new SqlParameter("@UID",   cboUser.SelectedValue),
+                    new SqlParameter("@Spec",  cboSpecialization.Text.Trim()),
+                    new SqlParameter("@Level", cboLevel.Text),
+                    new SqlParameter("@Avail", chkAvail.Checked ? 1 : 0)
+                };
 
                 if (_edit)
+                {
                     DatabaseHelper.ExecuteNonQuery(
                         "UPDATE Technicians SET UserID=@UID, Specialization=@Spec, Level=@Level, IsAvailable=@Avail WHERE TechnicianID=@ID",
                         new SqlParameter[] { p[0], p[1], p[2], p[3], new SqlParameter("@ID", _id) });
+
+                    MessageBox.Show("Technician updated successfully!", "Success",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
                 else
+                {
                     DatabaseHelper.ExecuteNonQuery(
                         "INSERT INTO Technicians(UserID, Specialization, Level, IsAvailable) VALUES(@UID,@Spec,@Level,@Avail)",
                         p);
 
-                MessageBox.Show(_edit ? "Technician updated!" : "Technician added!", "Success",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Technician added successfully!", "Success",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+
                 DialogResult = DialogResult.OK;
             }
             catch (Exception ex)

@@ -1,10 +1,10 @@
+using AutoTrack.Database;
+using AutoTrack.Helpers;
 using System;
 using System.Data;
 using System.Data.SqlClient;
 using System.Drawing;
 using System.Windows.Forms;
-using AutoTrack.Database;
-using AutoTrack.Helpers;
 
 namespace AutoTrack.Forms
 {
@@ -316,7 +316,7 @@ namespace AutoTrack.Forms
 
         public TechnicianDashboard()
         {
-            this.MinimumSize = new Size(1095, 1400);  
+            this.MinimumSize = new Size(1095, 1400);
             this.Height = 1500;
             InitializeTechnicianControls();
             this.Resize += TechnicianDashboard_Resize;
@@ -703,10 +703,11 @@ namespace AutoTrack.Forms
 
                 // Get supplier ID
                 object supplierIdObj = DatabaseHelper.ExecuteScalar(@"
-                SELECT s.SupplierID 
-                FROM Suppliers s
-                WHERE s.ContactPerson = (SELECT FullName FROM Users WHERE UserID = @UserID)",
-                    new[] { new SqlParameter("@UserID", userId) });
+SELECT s.SupplierID 
+FROM Suppliers s
+JOIN Users u ON s.SupplierID = u.SupplierID
+WHERE u.UserID = @UserID",
+    new[] { new SqlParameter("@UserID", userId) });
 
                 int supplierId = supplierIdObj != null ? Convert.ToInt32(supplierIdObj) : 0;
 
@@ -724,7 +725,7 @@ namespace AutoTrack.Forms
                     object completedCount = DatabaseHelper.ExecuteScalar(@"
                     SELECT COUNT(*) FROM RestockRequests rr
                     JOIN Inventory i ON rr.PartID = i.PartID
-                    WHERE i.SupplierID = @SupplierID AND rr.Status IN ('Approved', 'Delivered')",
+                    WHERE i.SupplierID = @SupplierID AND rr.Status IN ('Delivered')",
                         new[] { new SqlParameter("@SupplierID", supplierId) });
                     lblCompletedCount.Text = completedCount?.ToString() ?? "0";
 
@@ -756,7 +757,7 @@ namespace AutoTrack.Forms
                     FROM RestockRequests rr
                     JOIN Inventory p ON rr.PartID = p.PartID
                     JOIN Users u ON rr.RequestedBy = u.UserID
-                    WHERE p.SupplierID = @SupplierID AND rr.Status IN ('Approved', 'Delivered')
+                    WHERE p.SupplierID = @SupplierID AND rr.Status = 'Delivered'
                     ORDER BY rr.RequestDate DESC",
                         new[] { new SqlParameter("@SupplierID", supplierId) });
                     dgvCompletedRequests.DataSource = completedRequests;

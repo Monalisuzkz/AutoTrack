@@ -135,7 +135,7 @@ namespace AutoTrack.Forms
                 MaxDropDownItems = 8,
                 IntegralHeight = true
             };
-            };
+           
             Controls.Add(lblTech);
             Controls.Add(cboTech);
             currentY += rowHeight;

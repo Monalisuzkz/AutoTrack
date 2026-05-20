@@ -246,7 +246,6 @@ namespace AutoTrack.Forms
             btnServices.Visible = true;
             btnInventory.Visible = true;
             btnPayments.Visible = true;
-            btnArchivedItems.Visible = true;
         }
 
         private void ShowTechnicianMenu()
